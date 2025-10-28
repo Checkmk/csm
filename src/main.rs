@@ -2,7 +2,7 @@ mod env;
 mod robot;
 
 use clap::{Parser, Subcommand};
-use log::debug;
+use log::{LevelFilter, debug};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -11,6 +11,9 @@ use std::path::PathBuf;
 #[command(version)]
 /// Checkmk synthetic monitoring command-line tool
 struct Cli {
+    #[arg(short, long)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -27,9 +30,20 @@ enum Command {
 }
 
 fn main() {
-    env_logger::init();
-    let _ = create_mambarc();
     let cli = Cli::parse();
+
+    // Set up logging
+    let default_verbosity = if cli.verbose {
+        LevelFilter::Debug
+    } else {
+        LevelFilter::Error
+    };
+    let mut env_logger_builder = env_logger::Builder::new();
+    env_logger_builder.filter_level(default_verbosity);
+    env_logger_builder.parse_default_env();
+    env_logger_builder.init();
+
+    let _ = create_mambarc();
     match cli.command {
         Command::Env(sub) => env::run(sub),
         Command::Robot(sub) => robot::run(sub),
@@ -42,8 +56,8 @@ fn create_mambarc() -> std::io::Result<()> {
 changeps1: True
 
 # proxy_servers:
-#   http: http://user:pass@corp.com:8080_
-#   https: https://user:pass@corp.com:8080_
+#   http: http://user:pass@corp.com:8080
+#   https: https://user:pass@corp.com:8080
 
 # Use this only if you are behind a proxy that does SSL inspection
 # ssl_verify: false
