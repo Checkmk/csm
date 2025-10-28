@@ -1,0 +1,29 @@
+---
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci:
+    strategy:
+      matrix:
+        include:
+          - image: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - image: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+          rustflags: ""
+          target: ${{ matrix.target }}
+      - run: cargo fmt --check
+      - run: cargo clippy
+      - run: cargo build --release
