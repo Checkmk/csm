@@ -1,3 +1,5 @@
+use crate::csmrc::Config;
+
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
     /// Create an environment
@@ -27,6 +29,7 @@ pub struct CreateArgs {
     name: Option<String>,
 }
 
-pub fn run(subcommand: Subcommand) {
+pub fn run(config: Config, subcommand: Subcommand) {
+    println!("{:?}", config);
     println!("{:?}", subcommand);
 }

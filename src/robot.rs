@@ -1,3 +1,5 @@
+use crate::csmrc::Config;
+
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
     /// Create a Robotmk robot
@@ -13,6 +15,7 @@ pub struct CreateArgs {
     path: String,
 }
 
-pub fn run(subcommand: Subcommand) {
+pub fn run(config: Config, subcommand: Subcommand) {
+    println!("{:?}", config);
     println!("{:?}", subcommand);
 }
