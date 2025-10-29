@@ -4,7 +4,7 @@ use log::{debug, error};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::path::Component;
-use std::process;
+use std::process::ExitCode;
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
@@ -88,12 +88,12 @@ pub fn determine_env_name(args: CreateArgs) -> Option<String> {
     }
 }
 
-pub fn run(config: Config, subcommand: Subcommand) {
+pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
     match subcommand {
         Subcommand::Create(args) => {
             let Some(env_name) = determine_env_name(args) else {
                 error!("No environment name could be determined. You can specify one with --name");
-                process::exit(1); // TODO: Probably better to return Result and let main() do this.
+                return ExitCode::FAILURE
             };
             println!("env: {}", env_name);
         }
@@ -102,6 +102,7 @@ pub fn run(config: Config, subcommand: Subcommand) {
             println!("{:?}", subcommand);
         }
     }
+    ExitCode::SUCCESS
 }
 
 #[cfg(test)]
