@@ -1,8 +1,9 @@
+mod csmrc;
 mod env;
 mod robot;
 
 use clap::{Parser, Subcommand};
-use log::{LevelFilter, debug};
+use log::{LevelFilter, debug, error};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -29,7 +30,7 @@ enum Command {
     Robot(robot::Subcommand),
 }
 
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let cli = Cli::parse();
 
     // Set up logging
@@ -41,13 +42,22 @@ fn main() {
     let mut env_logger_builder = env_logger::Builder::new();
     env_logger_builder.filter_level(default_verbosity);
     env_logger_builder.parse_default_env();
+    env_logger_builder.format_timestamp(None);
     env_logger_builder.init();
 
     let _ = create_mambarc();
+    let config = match csmrc::Config::from_csmrc() {
+        Ok(config) => config,
+        Err(err) => {
+            error!("Failed to parse .csmrc: {}", err);
+            panic!("Failed to parse .csmrc as valid YAML");
+        }
+    };
     match cli.command {
-        Command::Env(sub) => env::run(sub),
-        Command::Robot(sub) => robot::run(sub),
+        Command::Env(sub) => env::run(config, sub),
+        Command::Robot(sub) => robot::run(config, sub),
     }
+    Ok(())
 }
 
 fn create_mambarc() -> std::io::Result<()> {
