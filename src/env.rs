@@ -93,7 +93,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
         Subcommand::Create(args) => {
             let Some(env_name) = determine_env_name(args) else {
                 error!("No environment name could be determined. You can specify one with --name");
-                return ExitCode::FAILURE
+                return ExitCode::FAILURE;
             };
             println!("env: {}", env_name);
         }

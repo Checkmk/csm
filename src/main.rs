@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use log::{LevelFilter, debug, error, warn};
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::ExitCode;
 
 #[derive(Parser, Debug)]
@@ -54,7 +54,11 @@ fn main() -> ExitCode {
 
     if let Err(e) = create_mambarc(&home) {
         let attempted_path = home.join(".mambarc");
-        warn!("Could not create {}, but continuing: {}", attempted_path.display(), e);
+        warn!(
+            "Could not create {}, but continuing: {}",
+            attempted_path.display(),
+            e
+        );
     }
 
     let config = match csmrc::Config::from_csmrc() {
@@ -72,7 +76,7 @@ fn main() -> ExitCode {
 
 /// Create a ~/.mambarc (%UserProfile%\.mambarc on Windows) if it does not
 /// exist.
-fn create_mambarc(home: &PathBuf) -> std::io::Result<()> {
+fn create_mambarc(home: &Path) -> std::io::Result<()> {
     let mambarc = include_str!("../templates/mambarc");
     let mambarc_path = home.join(".mambarc");
     match File::create_new(&mambarc_path) {
