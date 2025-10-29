@@ -1,0 +1,11 @@
+# Show the active environment in the shell prompt
+changeps1: True
+
+# proxy_servers:
+#   http: http://user:pass@corp.com:8080
+#   https: https://user:pass@corp.com:8080
+
+# Use this only if you are behind a proxy that does SSL inspection
+# ssl_verify: false
+# ssl_verify: mycorpcert.crt
+# ssl_no_revoke: true
