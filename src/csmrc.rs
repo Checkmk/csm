@@ -24,13 +24,18 @@ impl Config {
             return Ok(Self::default());
         };
         let csmrc_path = home.join(".csmrc");
-        let Ok(csmrc_data) = std::fs::read_to_string(csmrc_path) else {
-            debug!("No .csmrc found, using defaults");
-            return Ok(Config::default());
-        };
-        let config =
-            serde_yaml_ng::from_str(&csmrc_data).map_err(|e| Error::new(ErrorKind::InvalidData, e));
-        debug!("config: {:?}", config);
-        config
+        match std::fs::read_to_string(csmrc_path) {
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                debug!("No .csmrc found, using defaults");
+                Ok(Config::default())
+            }
+            Err(e) => Err(e),
+            Ok(csmrc_data) => {
+                let config = serde_yaml_ng::from_str(&csmrc_data)
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e));
+                debug!("config: {:?}", config);
+                config
+            }
+        }
     }
 }
