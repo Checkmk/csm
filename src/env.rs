@@ -110,12 +110,20 @@ mod tests {
     use super::*;
     use std::env;
     use std::fs;
+    use std::sync::Mutex;
+
+    // On Windows, set_current_dir() affects the whole process, though tests run
+    // in parallel. Thus for run_in_temp_dir(), we lock to force sequential
+    // execution of the tests.
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     /// Run a test in a temporary directory with an optional robotmk-env.yaml in it
     fn run_in_temp_dir<F>(dir_name: &str, yaml_content: Option<&str>, test_fn: F)
     where
         F: FnOnce(),
     {
+        let _lock = TEST_MUTEX.lock().unwrap();
+
         let temp_dir = env::temp_dir().join(dir_name);
         fs::create_dir_all(&temp_dir).unwrap();
 
