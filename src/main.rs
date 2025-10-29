@@ -1,6 +1,7 @@
 mod csmrc;
 mod env;
 mod robot;
+mod util;
 
 use clap::{Parser, Subcommand};
 use log::{LevelFilter, debug, error};
@@ -60,6 +61,8 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+/// Create a ~/.mambarc (%UserProfile%\.mambarc on Windows) if it does not
+/// exist.
 fn create_mambarc() -> std::io::Result<()> {
     let mambarc = r#"
 # Show the active environment in the shell prompt
@@ -74,9 +77,7 @@ changeps1: True
 # ssl_verify: mycorpcert.crt
 # ssl_no_revoke: true
 "#;
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .expect("Cannot determine home directory");
+    let home = util::homedir().expect("Cannot determine home directory");
     let mambarc_path = PathBuf::from(home).join(".mambarc");
     match File::create_new(&mambarc_path) {
         Ok(mut file) => file.write_all(mambarc.trim_start().as_bytes())?,
