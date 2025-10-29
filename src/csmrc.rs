@@ -1,4 +1,6 @@
 /// Module for reading a user's ~/.csmrc, if it exists.
+use crate::util;
+
 use log::debug;
 use serde::Deserialize;
 use std::default::Default;
@@ -15,16 +17,13 @@ pub struct Config {
 
 impl Config {
     /// Read the user's ~/.csmrc if it exists, merging with the Default instance for
-    /// Config.
+    /// Config. Return Err if a config file was found but failed to parse, otherwise
+    /// Ok with the result of merging the config file values with the Default (and
+    /// simply the Default if no config file exists).
     pub fn from_csmrc() -> Result<Self, std::io::Error> {
-        let home = match std::env::var("HOME") {
-            Ok(home) => home,
-            Err(_) => match std::env::var("USERPROFILE") {
-                Ok(home) => home,
-                Err(_) => return Ok(Config::default()),
-            },
+        let Ok(home) = util::homedir() else {
+            return Ok(Self::default());
         };
-
         let csmrc_path = PathBuf::from(home).join(".csmrc");
         let Ok(csmrc_data) = std::fs::read_to_string(csmrc_path) else {
             debug!("No .csmrc found, using defaults");
