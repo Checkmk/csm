@@ -1,7 +1,7 @@
 use crate::csmrc::Config;
 use crate::util::micromamba;
 
-use log::{debug, error};
+use log::{debug, error, info};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::path::Component;
@@ -96,8 +96,8 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                 error!("No environment name could be determined. You can specify one with --name");
                 return ExitCode::FAILURE;
             };
-            let cmd = micromamba(
-                config,
+            let mut cmd = micromamba(
+                &config,
                 vec![
                     "env",
                     "create",
@@ -107,19 +107,22 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                     &env_name,
                     "--yes",
                 ],
-            )
-            .spawn()
-            .expect("failed to call micromamba")
-            .wait();
-            match cmd {
-                // Exit with whatever code micromamba gives us
-                Ok(exit_status) => exit_status
-                    .code()
-                    .map(|c| ExitCode::from(c as u8))
-                    .unwrap_or(ExitCode::FAILURE),
-                Err(e) => {
-                    error!("Failed to spawn micromamba: {}", e);
-                    ExitCode::FAILURE
+            );
+            if config.noop_mode {
+                info!("Would run: {:?}", cmd);
+                ExitCode::SUCCESS
+            } else {
+                let cmd = cmd.spawn().expect("failed to call micromamba").wait();
+                match cmd {
+                    // Exit with whatever code micromamba gives us
+                    Ok(exit_status) => exit_status
+                        .code()
+                        .map(|c| ExitCode::from(c as u8))
+                        .unwrap_or(ExitCode::FAILURE),
+                    Err(e) => {
+                        error!("Failed to spawn micromamba: {}", e);
+                        ExitCode::FAILURE
+                    }
                 }
             }
         }
