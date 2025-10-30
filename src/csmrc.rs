@@ -6,12 +6,26 @@ use serde::Deserialize;
 use std::default::Default;
 use std::io::{Error, ErrorKind};
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     /// Override the $MAMBA_ROOT_PREFIX when shelling out to micromamba.
     #[serde(default)]
-    #[allow(dead_code)]
     pub mamba_root_prefix: Option<String>,
+
+    /// If true, don't make any changes or call any commands, just print what
+    /// we *would* do normally.
+    #[serde(default)]
+    pub noop_mode: bool,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            mamba_root_prefix: None,
+            noop_mode: false,
+        }
+    }
 }
 
 impl Config {
