@@ -1,5 +1,4 @@
-/// Module for reading a user's ~/.csmrc, if it exists.
-use crate::util;
+//! Module for reading a user's ~/.csmrc, if it exists.
 
 use log::debug;
 use serde::Deserialize;
@@ -34,7 +33,7 @@ impl Config {
     /// Ok with the result of merging the config file values with the Default (and
     /// simply the Default if no config file exists).
     pub fn from_csmrc() -> Result<Self, std::io::Error> {
-        let Some(home) = util::homedir() else {
+        let Some(home) = dirs::home_dir() else {
             return Ok(Self::default());
         };
         let csmrc_path = home.join(".csmrc");
