@@ -4,7 +4,7 @@ use log::{debug, error};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::path::Component;
-use std::process;
+use std::process::ExitCode;
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
@@ -88,12 +88,12 @@ pub fn determine_env_name(args: CreateArgs) -> Option<String> {
     }
 }
 
-pub fn run(config: Config, subcommand: Subcommand) {
+pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
     match subcommand {
         Subcommand::Create(args) => {
             let Some(env_name) = determine_env_name(args) else {
                 error!("No environment name could be determined. You can specify one with --name");
-                process::exit(1); // TODO: Probably better to return Result and let main() do this.
+                return ExitCode::FAILURE;
             };
             println!("env: {}", env_name);
         }
@@ -102,6 +102,7 @@ pub fn run(config: Config, subcommand: Subcommand) {
             println!("{:?}", subcommand);
         }
     }
+    ExitCode::SUCCESS
 }
 
 #[cfg(test)]
@@ -109,12 +110,20 @@ mod tests {
     use super::*;
     use std::env;
     use std::fs;
+    use std::sync::Mutex;
+
+    // On Windows, set_current_dir() affects the whole process, though tests run
+    // in parallel. Thus for run_in_temp_dir(), we lock to force sequential
+    // execution of the tests.
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     /// Run a test in a temporary directory with an optional robotmk-env.yaml in it
     fn run_in_temp_dir<F>(dir_name: &str, yaml_content: Option<&str>, test_fn: F)
     where
         F: FnOnce(),
     {
+        let _lock = TEST_MUTEX.lock().unwrap();
+
         let temp_dir = env::temp_dir().join(dir_name);
         fs::create_dir_all(&temp_dir).unwrap();
 

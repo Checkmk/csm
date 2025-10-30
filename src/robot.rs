@@ -1,5 +1,7 @@
 use crate::csmrc::Config;
 
+use std::process::ExitCode;
+
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
     /// Create a Robotmk robot
@@ -15,7 +17,8 @@ pub struct CreateArgs {
     path: String,
 }
 
-pub fn run(config: Config, subcommand: Subcommand) {
+pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
     println!("{:?}", config);
     println!("{:?}", subcommand);
+    ExitCode::SUCCESS
 }

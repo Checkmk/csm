@@ -5,7 +5,6 @@ use log::debug;
 use serde::Deserialize;
 use std::default::Default;
 use std::io::{Error, ErrorKind};
-use std::path::PathBuf;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
@@ -21,17 +20,22 @@ impl Config {
     /// Ok with the result of merging the config file values with the Default (and
     /// simply the Default if no config file exists).
     pub fn from_csmrc() -> Result<Self, std::io::Error> {
-        let Ok(home) = util::homedir() else {
+        let Some(home) = util::homedir() else {
             return Ok(Self::default());
         };
-        let csmrc_path = PathBuf::from(home).join(".csmrc");
-        let Ok(csmrc_data) = std::fs::read_to_string(csmrc_path) else {
-            debug!("No .csmrc found, using defaults");
-            return Ok(Config::default());
-        };
-        let config =
-            serde_yaml_ng::from_str(&csmrc_data).map_err(|e| Error::new(ErrorKind::InvalidData, e));
-        debug!("config: {:?}", config);
-        config
+        let csmrc_path = home.join(".csmrc");
+        match std::fs::read_to_string(csmrc_path) {
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                debug!("No .csmrc found, using defaults");
+                Ok(Config::default())
+            }
+            Err(e) => Err(e),
+            Ok(csmrc_data) => {
+                let config = serde_yaml_ng::from_str(&csmrc_data)
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e));
+                debug!("config: {:?}", config);
+                config
+            }
+        }
     }
 }
