@@ -71,7 +71,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let Some(home) = util::homedir() else {
+    let Some(home) = dirs::home_dir() else {
         error!("Failed to determine home directory");
         return ExitCode::FAILURE;
     };
