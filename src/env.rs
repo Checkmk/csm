@@ -1,4 +1,5 @@
 use crate::csmrc::Config;
+use crate::util::micromamba;
 
 use log::{debug, error};
 use serde::Deserialize;
@@ -95,14 +96,39 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                 error!("No environment name could be determined. You can specify one with --name");
                 return ExitCode::FAILURE;
             };
-            println!("env: {}", env_name);
+            let cmd = micromamba(
+                config,
+                vec![
+                    "env",
+                    "create",
+                    "--file",
+                    "robotmk-env.yaml",
+                    "--name",
+                    &env_name,
+                    "--yes",
+                ],
+            )
+            .spawn()
+            .expect("failed to call micromamba")
+            .wait();
+            match cmd {
+                // Exit with whatever code micromamba gives us
+                Ok(exit_status) => exit_status
+                    .code()
+                    .map(|c| ExitCode::from(c as u8))
+                    .unwrap_or(ExitCode::FAILURE),
+                Err(e) => {
+                    error!("Failed to spawn micromamba: {}", e);
+                    ExitCode::FAILURE
+                }
+            }
         }
         _ => {
             println!("{:?}", config);
             println!("{:?}", subcommand);
+            ExitCode::SUCCESS
         }
     }
-    ExitCode::SUCCESS
 }
 
 #[cfg(test)]
