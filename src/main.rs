@@ -1,7 +1,7 @@
 mod csmrc;
 mod env;
+mod micromamba;
 mod robot;
-mod util;
 
 use crate::csmrc::Config;
 use clap::{Parser, Subcommand};

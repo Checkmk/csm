@@ -1,7 +1,7 @@
 use crate::csmrc::Config;
-use crate::util::micromamba;
+use crate::micromamba::micromamba;
 
-use log::{debug, error, info};
+use log::{debug, error};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::path::Component;
@@ -96,7 +96,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                 error!("No environment name could be determined. You can specify one with --name");
                 return ExitCode::FAILURE;
             };
-            let mut cmd = micromamba(
+            let result = micromamba(
                 &config,
                 vec![
                     "env",
@@ -108,23 +108,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                     "--yes",
                 ],
             );
-            if config.noop_mode {
-                info!("Would run: {:?}", cmd);
-                ExitCode::SUCCESS
-            } else {
-                let cmd = cmd.spawn().expect("failed to call micromamba").wait();
-                match cmd {
-                    // Exit with whatever code micromamba gives us
-                    Ok(exit_status) => exit_status
-                        .code()
-                        .map(|c| ExitCode::from(c as u8))
-                        .unwrap_or(ExitCode::FAILURE),
-                    Err(e) => {
-                        error!("Failed to spawn micromamba: {}", e);
-                        ExitCode::FAILURE
-                    }
-                }
-            }
+            result.exit_code()
         }
         _ => {
             println!("{:?}", config);
