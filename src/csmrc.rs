@@ -6,22 +6,19 @@ use std::default::Default;
 use std::io::{Error, ErrorKind};
 
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Config {
     /// Override the $MAMBA_ROOT_PREFIX when shelling out to micromamba.
-    #[serde(default)]
     pub mamba_root_prefix: Option<String>,
 
     /// If true, don't make any changes or call any commands, just print what
     /// we *would* do normally.
-    #[serde(default)]
     pub noop_mode: bool,
 
     /// Override the cache directory for testing purposes.
-    #[serde(default)]
     pub cache_dir: Option<String>,
 
     /// If false, skip downloading micromamba even if needed (for testing).
-    #[serde(default)]
     pub download_micromamba: bool,
 }
 
