@@ -6,15 +6,20 @@ use std::default::Default;
 use std::io::{Error, ErrorKind};
 
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Config {
     /// Override the $MAMBA_ROOT_PREFIX when shelling out to micromamba.
-    #[serde(default)]
     pub mamba_root_prefix: Option<String>,
 
     /// If true, don't make any changes or call any commands, just print what
     /// we *would* do normally.
-    #[serde(default)]
     pub noop_mode: bool,
+
+    /// Override the cache directory for testing purposes.
+    pub cache_dir: Option<String>,
+
+    /// If false, skip downloading micromamba even if needed (for testing).
+    pub download_micromamba: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -23,6 +28,8 @@ impl Default for Config {
         Config {
             mamba_root_prefix: None,
             noop_mode: false,
+            cache_dir: None,
+            download_micromamba: true,
         }
     }
 }
@@ -33,7 +40,7 @@ impl Config {
     /// Ok with the result of merging the config file values with the Default (and
     /// simply the Default if no config file exists).
     pub fn from_csmrc() -> Result<Self, std::io::Error> {
-        let Some(home) = dirs::home_dir() else {
+        let Some(home) = std::env::home_dir() else {
             return Ok(Self::default());
         };
         let csmrc_path = home.join(".csmrc");

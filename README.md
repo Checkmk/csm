@@ -11,3 +11,12 @@ available:
 * `mamba_root_prefix` - A string which sets where the Mamba environment(s) will
   be created on disk. By default, this is left up to `micromamba` and its
   default root prefix is used.
+
+* `cache_dir` - A string path which is used as the cache directory. Currently,
+  this is used for storing the `micromamba` binary if it is downloaded by `csm`
+  (see next option).
+
+* `download_micromamba` - A boolean, determines whether or not we should try to
+  download `micromamba` if it was not found in `$PATH`. This is mostly useful
+  for testing, but could be useful if you wish to ensure `csm` never downloads
+  `micromamba` even if the one in `$PATH` should disappear.
