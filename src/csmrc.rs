@@ -40,7 +40,7 @@ impl Config {
     /// Ok with the result of merging the config file values with the Default (and
     /// simply the Default if no config file exists).
     pub fn from_csmrc() -> Result<Self, std::io::Error> {
-        let Some(home) = dirs::home_dir() else {
+        let Some(home) = std::env::home_dir() else {
             return Ok(Self::default());
         };
         let csmrc_path = home.join(".csmrc");

@@ -24,6 +24,7 @@ jobs:
           components: clippy, rustfmt
           rustflags: ""
           target: ${{ matrix.target }}
+      - uses: mamba-org/setup-micromamba@v2
       - run: cargo fmt --check
       - run: cargo clippy
       - run: cargo test

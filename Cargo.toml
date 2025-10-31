@@ -13,3 +13,9 @@ reqwest = { version = "0.12.24", features = ["blocking"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml_ng = "0.10.0"
 tar = "0.4.44"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.0"
+tempfile = "3.0"
+which = "8.0.0"
