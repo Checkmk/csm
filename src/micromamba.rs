@@ -44,6 +44,7 @@ impl MicromambaResult {
 enum DownloadError {
     IncompatibleOS,
     BinNotInArchive,
+    DownloadDisabled,
     IO(io::Error),
     Reqwest(reqwest::Error),
 }
@@ -67,6 +68,10 @@ impl std::fmt::Display for DownloadError {
             DownloadError::BinNotInArchive => {
                 write!(f, "micromamba binary not found in downloaded archive")
             }
+            DownloadError::DownloadDisabled => write!(
+                f,
+                "Wanted to download micromamba, but doing so is disabled by csm configuration"
+            ),
             DownloadError::IO(e) => write!(f, "IO error: {}", e),
             DownloadError::Reqwest(e) => write!(f, "Failed to download micromamba: {}", e),
         }
@@ -254,6 +259,11 @@ fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
     let url = format!("https://micro.mamba.pm/api/micromamba/{}-64/latest", os);
     debug!("Going to download {}", url);
     info!("micromamba was not found on path; downloading it now");
+
+    if !config.download_micromamba {
+        return Err(DownloadError::DownloadDisabled);
+    }
+
     let response_tarbz2 = reqwest::blocking::get(url)?;
     debug!("Download completed, sending it to BzDecoder");
     let bz2_decoder = bzip2::read::BzDecoder::new(response_tarbz2);
