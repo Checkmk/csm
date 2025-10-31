@@ -166,7 +166,7 @@ pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
     // If we weren't successful there, we download micromamba to the user cache
     // directory.
     debug!("micromamba not found in $PATH, falling back to cache");
-    let downloaded_path = match download_micromamba() {
+    let downloaded_path = match download_micromamba(config) {
         Ok(path) => path,
         Err(e) => {
             error!("Could not download micromamba: {}", e);
@@ -200,14 +200,17 @@ pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
 }
 
 /// Attempt to create the cache directory if necessary, then return it.
-///
-/// If it does not exist and we cannot create it for any reason, return None.
-fn csm_cache_dir() -> std::io::Result<PathBuf> {
-    let Some(cache) = dirs::cache_dir().map(|p| p.join("csm")) else {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "could not determine user cache directory",
-        ));
+fn csm_cache_dir(config: &Config) -> std::io::Result<PathBuf> {
+    let cache = if let Some(cache_dir) = &config.cache_dir {
+        PathBuf::from(cache_dir)
+    } else {
+        let Some(cache) = dirs::cache_dir().map(|p| p.join("csm")) else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "could not determine user cache directory",
+            ));
+        };
+        cache
     };
     fs::create_dir_all(&cache)?;
     Ok(cache)
@@ -217,9 +220,8 @@ fn csm_cache_dir() -> std::io::Result<PathBuf> {
 ///
 /// If the file already exists in the cache directory, return the location to
 /// it. Otherwise, download it first and then return the location to it.
-
-fn download_micromamba() -> Result<PathBuf, DownloadError> {
-    let cache_dir = csm_cache_dir()?;
+fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
+    let cache_dir = csm_cache_dir(config)?;
     let micromamba_path = if cfg!(target_os = "linux") {
         cache_dir.join("micromamba")
     } else if cfg!(target_os = "windows") {
