@@ -3,6 +3,9 @@
 use crate::csmrc::Config;
 use log::{debug, error, info};
 use std::collections::HashMap;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, ExitStatus};
 
 /// The result from trying to shell out to `micromamba`.
@@ -20,6 +23,8 @@ pub enum MicromambaResult {
     /// We were able to successfully call it and get a result
     Ok(ExitStatus),
     /// We were unable to find or create a working `micromamba`
+    NotFound,
+    /// We found a micromamba binary, but could not run it
     CouldNotRun,
 }
 
@@ -31,14 +36,46 @@ impl MicromambaResult {
                 .map(|c| ExitCode::from(c as u8))
                 .unwrap_or(ExitCode::FAILURE),
             Self::Noop => ExitCode::SUCCESS,
-            Self::CouldNotRun => ExitCode::FAILURE,
+            _ => ExitCode::FAILURE,
+        }
+    }
+}
+
+enum DownloadError {
+    IncompatibleOS,
+    BinNotInArchive,
+    IO(io::Error),
+    Reqwest(reqwest::Error),
+}
+
+impl From<io::Error> for DownloadError {
+    fn from(err: io::Error) -> Self {
+        Self::IO(err)
+    }
+}
+
+impl From<reqwest::Error> for DownloadError {
+    fn from(err: reqwest::Error) -> Self {
+        Self::Reqwest(err)
+    }
+}
+
+impl std::fmt::Display for DownloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DownloadError::IncompatibleOS => write!(f, "Incompatible OS for micromamba download"),
+            DownloadError::BinNotInArchive => {
+                write!(f, "micromamba binary not found in downloaded archive")
+            }
+            DownloadError::IO(e) => write!(f, "IO error: {}", e),
+            DownloadError::Reqwest(e) => write!(f, "Failed to download micromamba: {}", e),
         }
     }
 }
 
 /// Return a [`Command`] ready to shell out to `micromamba` with the appropriate
 /// environment variables set based on configuration.
-pub fn micromamba_at(path: &str, config: &Config, args: Vec<&str>) -> Command {
+pub fn micromamba_at(path: &str, config: &Config, args: &Vec<&str>) -> Command {
     let mut env_vars: HashMap<&str, String> = HashMap::new();
 
     if let Some(mamba_root_prefix) = &config.mamba_root_prefix {
@@ -54,6 +91,35 @@ pub fn micromamba_at(path: &str, config: &Config, args: Vec<&str>) -> Command {
         debug!("About to run: {:?}", cmd);
     }
     cmd
+}
+
+fn block_on_child_exit(child: &mut std::process::Child) -> MicromambaResult {
+    match child.wait() {
+        Ok(exit_status) => {
+            debug!("micromamba exited with status: {}", exit_status);
+            MicromambaResult::Ok(exit_status)
+        }
+        Err(e) => {
+            error!("We found a micromamba binary, but failed to wait for it to run");
+            error!("Error was: {}", e);
+            MicromambaResult::CouldNotRun
+        }
+    }
+}
+
+fn exec_micromamba(cmd: &mut Command) -> MicromambaResult {
+    match cmd.spawn() {
+        Ok(mut child) => block_on_child_exit(&mut child),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            debug!("Could not run micromamba at specified path: {}", e);
+            MicromambaResult::NotFound
+        }
+        Err(e) => {
+            error!("We found a micromamba binary, but failed to run it");
+            error!("Error was: {}", e);
+            MicromambaResult::CouldNotRun
+        }
+    }
 }
 
 /// Run `micromamba` and return the result, if able.
@@ -74,32 +140,56 @@ pub fn micromamba_at(path: &str, config: &Config, args: Vec<&str>) -> Command {
 ///   based on compile target) and write it to the user cache directory rather
 ///   than downloading it. But this inflates our binary size.
 pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
-    let mut cmd = micromamba_at("micromamba", config, args);
+    let mut cmd = micromamba_at("micromamba", config, &args);
 
     if config.noop_mode {
         // Do nothing. micromamba_at() already logged what we're about to run.
         return MicromambaResult::Noop;
     }
 
-    // First we try from $PATH
-    if let Ok(mut child) = cmd.spawn() {
-        debug!("Used micromamba from $PATH");
-        match child.wait() {
-            Ok(exit_status) => return MicromambaResult::Ok(exit_status),
-            Err(e) => {
-                // In this case don't try to download one, there is probably a
-                // bigger issue.
-                error!("We found a micromamba binary, but failed to wait for it to run");
-                error!("Error was: {}", e);
-                return MicromambaResult::CouldNotRun;
-            }
+    // If we were able to get a result using micromamba found in $PATH, then
+    // we're done.
+    match exec_micromamba(&mut cmd) {
+        ok @ MicromambaResult::Ok(_) => {
+            debug!("Ran micromamba found in $PATH");
+            return ok;
         }
+        MicromambaResult::CouldNotRun => {
+            // In this case, bail out and let the user fix their micromamba
+            // installation.
+            debug!("micromamba found in $PATH could not be run, aborting");
+            return MicromambaResult::CouldNotRun;
+        }
+        _ => {}
     }
 
     // If we weren't successful there, we download micromamba to the user cache
     // directory.
-
-    // TODO
+    debug!("micromamba not found in $PATH, falling back to cache");
+    let downloaded_path = match download_micromamba() {
+        Ok(path) => path,
+        Err(e) => {
+            error!("Could not download micromamba: {}", e);
+            return MicromambaResult::CouldNotRun;
+        }
+    };
+    let mut cmd = micromamba_at(&downloaded_path.to_string_lossy(), config, &args);
+    match exec_micromamba(&mut cmd) {
+        ok @ MicromambaResult::Ok(_) => {
+            debug!(
+                "Ran downloaded/cached micromamba at {}",
+                downloaded_path.display()
+            );
+            return ok;
+        }
+        MicromambaResult::CouldNotRun => {
+            debug!(
+                "Downloaded micromamba at {} could not be run",
+                downloaded_path.display()
+            );
+        }
+        _ => {}
+    }
 
     // Finally, if we couldn't run the downloaded one either, just bail out
     error!("Could not find a suitable micromamba binary to run");
@@ -107,4 +197,90 @@ pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
         "Please install micromamba manually, ensure it is executable, and place it somewhere in $PATH"
     );
     MicromambaResult::CouldNotRun
+}
+
+/// Attempt to create the cache directory if necessary, then return it.
+///
+/// If it does not exist and we cannot create it for any reason, return None.
+fn csm_cache_dir() -> std::io::Result<PathBuf> {
+    let Some(cache) = dirs::cache_dir().map(|p| p.join("csm")) else {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "could not determine user cache directory",
+        ));
+    };
+    fs::create_dir_all(&cache)?;
+    Ok(cache)
+}
+
+/// Attempt to download micromamba and store it in the user's cache directory.
+///
+/// If the file already exists in the cache directory, return the location to
+/// it. Otherwise, download it first and then return the location to it.
+
+fn download_micromamba() -> Result<PathBuf, DownloadError> {
+    let cache_dir = csm_cache_dir()?;
+    let micromamba_path = if cfg!(target_os = "linux") {
+        cache_dir.join("micromamba")
+    } else if cfg!(target_os = "windows") {
+        cache_dir.join("micromamba.exe")
+    } else {
+        return Err(DownloadError::IncompatibleOS);
+    };
+
+    if micromamba_path.exists() {
+        return Ok(micromamba_path);
+    }
+
+    let os = if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "windows") {
+        "win"
+    } else {
+        return Err(DownloadError::IncompatibleOS);
+    };
+
+    let archive_binary_path = if cfg!(target_os = "linux") {
+        Path::new("bin").join("micromamba")
+    } else if cfg!(target_os = "windows") {
+        Path::new("Library").join("bin").join("micromamba.exe")
+    } else {
+        return Err(DownloadError::IncompatibleOS);
+    };
+
+    // TODO: Do we need to worry about other architectures? (aarch64)
+    let url = format!("https://micro.mamba.pm/api/micromamba/{}-64/latest", os);
+    debug!("Going to download {}", url);
+    info!("micromamba was not found on path; downloading it now");
+    let response_tarbz2 = reqwest::blocking::get(url)?;
+    debug!("Download completed, sending it to BzDecoder");
+    let bz2_decoder = bzip2::read::BzDecoder::new(response_tarbz2);
+    let mut tar_archive = tar::Archive::new(bz2_decoder);
+
+    debug!("Looking for bin/micromamba in the tarfile");
+    for entry in tar_archive.entries()? {
+        let mut entry = entry?;
+        if let Ok(path) = entry.path()
+            && path == archive_binary_path
+        {
+            debug!(
+                "Found it, writing it to disk at {}",
+                micromamba_path.display()
+            );
+            let mut out = fs::File::create(&micromamba_path)?;
+            io::copy(&mut entry, &mut out)?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = out.metadata()?.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&micromamba_path, perms)?;
+            }
+
+            return Ok(micromamba_path);
+        }
+    }
+
+    Err(DownloadError::BinNotInArchive)
 }
