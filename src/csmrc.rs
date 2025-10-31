@@ -15,6 +15,10 @@ pub struct Config {
     /// we *would* do normally.
     #[serde(default)]
     pub noop_mode: bool,
+
+    /// Override the cache directory for testing purposes.
+    #[serde(default)]
+    pub cache_dir: Option<String>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -23,6 +27,7 @@ impl Default for Config {
         Config {
             mamba_root_prefix: None,
             noop_mode: false,
+            cache_dir: None,
         }
     }
 }
