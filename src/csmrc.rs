@@ -19,6 +19,10 @@ pub struct Config {
     /// Override the cache directory for testing purposes.
     #[serde(default)]
     pub cache_dir: Option<String>,
+
+    /// If false, skip downloading micromamba even if needed (for testing).
+    #[serde(default)]
+    pub download_micromamba: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -28,6 +32,7 @@ impl Default for Config {
             mamba_root_prefix: None,
             noop_mode: false,
             cache_dir: None,
+            download_micromamba: true,
         }
     }
 }
