@@ -47,3 +47,13 @@ fn test_csm_env_info() -> Result<(), Error> {
         .stdout(predicate::str::contains("populated config files : "));
     Ok(())
 }
+
+/// Test that running a command like `csm env info` generates a `.mambarc` in
+/// the user's home directory.
+#[test]
+fn test_csm_creates_mambarc() -> Result<(), Error> {
+    let csm = common::Csm::new()?;
+    csm.command().args(&["env", "info"]).assert().success();
+    let mambarc_path = csm.home_dir.path().join(".mambarc");
+    Ok(std::fs::read_to_string(mambarc_path).map(|_| ())?)
+}
