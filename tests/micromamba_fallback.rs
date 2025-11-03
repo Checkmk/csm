@@ -6,7 +6,7 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tempfile::TempDir;
 use which::which;
 
@@ -20,16 +20,6 @@ fn micromamba_path_dir() -> Result<PathBuf, Error> {
             "No parent directory",
         ))
     })
-}
-
-/// Helper to create a csmrc config file for testing with downloads disabled
-fn create_test_csmrc(home_dir: &Path, cache_dir: &Path) -> Result<(), io::Error> {
-    let csmrc_content = format!(
-        "cache_dir: {}\n\
-         download_micromamba: false\n",
-        cache_dir.display()
-    );
-    fs::write(home_dir.join(".csmrc"), csmrc_content)
 }
 
 /// Test micromamba found in $PATH
@@ -81,6 +71,12 @@ fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
     let cache_dir = temp_dir.path().join("cache");
     fs::create_dir_all(&cache_dir)?;
 
+    let config = format!(
+        "cache_dir: {}\ndownload_micromamba: false",
+        cache_dir.to_string_lossy()
+    );
+    common::write_csmrc(temp_dir.path(), &config)?;
+
     // Copy micromamba binary to cache dir
     let binary_name = if cfg!(windows) {
         "micromamba.exe"
@@ -88,8 +84,6 @@ fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
         "micromamba"
     };
     fs::copy(which("micromamba")?, cache_dir.join(binary_name))?;
-
-    create_test_csmrc(temp_dir.path(), &cache_dir)?;
 
     let mut cmd = cargo_bin_cmd!();
     cmd.env("PATH", temp_dir.path()) // Something without micromamba
@@ -112,7 +106,12 @@ fn test_micromamba_fallback_to_download() -> Result<(), Error> {
     let temp_dir = TempDir::new()?;
     let cache_dir = temp_dir.path().join("cache");
     fs::create_dir_all(&cache_dir)?;
-    create_test_csmrc(temp_dir.path(), &cache_dir)?;
+
+    let config = format!(
+        "cache_dir: {}\ndownload_micromamba: false",
+        cache_dir.to_string_lossy()
+    );
+    common::write_csmrc(temp_dir.path(), &config)?;
 
     let empty_path_dir = temp_dir.path().join("empty_path");
     fs::create_dir_all(&empty_path_dir)?;
