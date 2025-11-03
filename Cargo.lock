@@ -222,6 +222,7 @@ dependencies = [
  "env_logger",
  "log",
  "predicates",
+ "regex",
  "reqwest",
  "serde",
  "serde_yaml_ng",

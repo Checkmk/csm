@@ -3,6 +3,7 @@
 pub enum Error {
     Which(which::Error),
     IO(std::io::Error),
+    Regex(regex::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -14,5 +15,11 @@ impl From<std::io::Error> for Error {
 impl From<which::Error> for Error {
     fn from(err: which::Error) -> Self {
         Self::Which(err)
+    }
+}
+
+impl From<regex::Error> for Error {
+    fn from(err: regex::Error) -> Self {
+        Self::Regex(err)
     }
 }
