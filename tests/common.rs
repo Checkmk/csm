@@ -2,7 +2,7 @@
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::cmd::Command;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[derive(Debug)]
@@ -31,29 +31,30 @@ impl From<regex::Error> for Error {
 }
 
 pub struct Csm {
-    pub command: Command,
     pub home_dir: TempDir,
+}
+
+impl Csm {
+    pub fn new() -> Result<Csm, Error> {
+        Ok(Self {
+            home_dir: TempDir::new()?,
+        })
+    }
+
+    pub fn command(&self) -> Command {
+        let mut command = cargo_bin_cmd!();
+        // Avoid reading real .csmrc
+        command.env("HOME", self.home_dir.path());
+        command.env("USERPROFILE", self.home_dir.path());
+
+        command
+    }
+
+    pub fn write_csmrc(&self, config: &str) -> Result<(), std::io::Error> {
+        std::fs::write(self.home_dir.path().join(".csmrc"), config)
+    }
 }
 
 pub fn tests_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests")
-}
-
-pub fn write_csmrc(home_dir: &Path, config: &str) -> Result<(), std::io::Error> {
-    std::fs::write(home_dir.join(".csmrc"), config)
-}
-
-pub fn csm() -> Result<Csm, Error> {
-    let temp_dir = TempDir::new()?;
-
-    let mut command = cargo_bin_cmd!();
-    command.env("HOME", temp_dir.path()); // Avoid reading real .csmrc
-    command.env("USERPROFILE", temp_dir.path());
-
-    let csm = Csm {
-        command: command,
-        home_dir: temp_dir,
-    };
-
-    Ok(csm)
 }
