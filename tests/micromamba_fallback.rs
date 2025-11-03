@@ -1,3 +1,7 @@
+mod common;
+
+use common::Error;
+
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use std::fs;
@@ -5,25 +9,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use which::which;
-
-#[derive(Debug)]
-#[allow(dead_code)]
-enum Error {
-    Which(which::Error),
-    IO(io::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Self::IO(err)
-    }
-}
-
-impl From<which::Error> for Error {
-    fn from(err: which::Error) -> Self {
-        Self::Which(err)
-    }
-}
 
 /// Return the directory containing `micromamba` (linux) or
 /// `micromamba.exe` (windows). Used for setting $PATH in tests below.
