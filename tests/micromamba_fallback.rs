@@ -9,8 +9,8 @@ use which::which;
 /// Test micromamba found in $PATH
 #[test]
 fn test_micromamba_in_path_success() -> Result<(), Error> {
-    common::csm()?
-        .command
+    common::Csm::new()?
+        .command()
         .args(&["--verbose", "env", "create", "--name", "test-env"])
         .assert()
         .failure() // no robotmk-env.yaml, so micromamba fails
@@ -21,7 +21,7 @@ fn test_micromamba_in_path_success() -> Result<(), Error> {
 /// Test micromamba found in $PATH but fails to execute
 #[test]
 fn test_micromamba_in_path_cannot_be_run() -> Result<(), Error> {
-    let csm = common::csm()?;
+    let csm = common::Csm::new()?;
 
     // Just create a file named micromamba that is not executable
     let micromamba_path = if cfg!(windows) {
@@ -31,7 +31,7 @@ fn test_micromamba_in_path_cannot_be_run() -> Result<(), Error> {
     };
     fs::write(&micromamba_path, "not an executable").unwrap();
 
-    let mut cmd = csm.command;
+    let mut cmd = csm.command();
     cmd.env("PATH", csm.home_dir.path())
         .args(&["--verbose", "env", "create", "--name", "test-env"])
         .assert()
@@ -45,7 +45,7 @@ fn test_micromamba_in_path_cannot_be_run() -> Result<(), Error> {
 /// micromamba not in $PATH, but cached version exists and works
 #[test]
 fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
-    let csm = common::csm()?;
+    let csm = common::Csm::new()?;
     let cache_dir = csm.home_dir.path().join("cache");
     fs::create_dir_all(&cache_dir)?;
 
@@ -53,7 +53,7 @@ fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
         "cache_dir: {}\ndownload_micromamba: false",
         cache_dir.to_string_lossy()
     );
-    common::write_csmrc(csm.home_dir.path(), &config)?;
+    csm.write_csmrc(&config)?;
 
     // Copy micromamba binary to cache dir
     let binary_name = if cfg!(windows) {
@@ -63,7 +63,7 @@ fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
     };
     fs::copy(which("micromamba")?, cache_dir.join(binary_name))?;
 
-    let mut cmd = csm.command;
+    let mut cmd = csm.command();
     cmd.env("PATH", csm.home_dir.path()) // Something without micromamba
         .args(&["--verbose", "env", "create", "--name", "test-env"])
         .assert()
@@ -79,7 +79,7 @@ fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
 /// micromamba not in $PATH and not cached, download would be attempted but is disabled
 #[test]
 fn test_micromamba_fallback_to_download() -> Result<(), Error> {
-    let csm = common::csm()?;
+    let csm = common::Csm::new()?;
     let cache_dir = csm.home_dir.path().join("cache");
     fs::create_dir_all(&cache_dir)?;
 
@@ -87,9 +87,9 @@ fn test_micromamba_fallback_to_download() -> Result<(), Error> {
         "cache_dir: {}\ndownload_micromamba: false",
         cache_dir.to_string_lossy()
     );
-    common::write_csmrc(csm.home_dir.path(), &config)?;
+    csm.write_csmrc(&config)?;
 
-    let mut cmd = csm.command;
+    let mut cmd = csm.command();
     cmd.env("PATH", csm.home_dir.path()) // Something without micromamba
         .args(&["--verbose", "env", "create", "--name", "test-env"])
         .assert()
@@ -104,8 +104,8 @@ fn test_micromamba_fallback_to_download() -> Result<(), Error> {
 /// noop mode doesn't actually execute anything
 #[test]
 fn test_noop_mode() -> Result<(), Error> {
-    common::csm()?
-        .command
+    common::Csm::new()?
+        .command()
         .args(&["--verbose", "--noop", "env", "create", "--name", "test-env"])
         .assert()
         .success()
