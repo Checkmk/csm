@@ -111,6 +111,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             result.exit_code()
         }
         Subcommand::List => micromamba(&config, vec!["env", "list"]).exit_code(),
+        Subcommand::Info => micromamba(&config, vec!["info"]).exit_code(),
         _ => {
             println!("{:?}", config);
             println!("{:?}", subcommand);
