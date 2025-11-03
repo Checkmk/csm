@@ -16,6 +16,7 @@ tar = "0.4.44"
 
 [dev-dependencies]
 assert_cmd = "2.0"
-predicates = "3.0"
+predicates = { version = "3.0", features = ["regex"] }
+regex = "1.12.2"
 tempfile = "3.0"
 which = "8.0.0"
