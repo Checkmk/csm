@@ -35,3 +35,15 @@ fn test_csm_env_list() -> Result<(), Error> {
         .stdout(predicate::str::contains("test_csm_env_list"));
     Ok(())
 }
+
+/// Test `csm env info`
+#[test]
+fn test_csm_env_info() -> Result<(), Error> {
+    common::Csm::new()?
+        .command()
+        .args(&["env", "info"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("populated config files : "));
+    Ok(())
+}
