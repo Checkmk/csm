@@ -3,13 +3,14 @@
 use assert_cmd::cargo::cargo_bin_cmd;
 use assert_cmd::cmd::Command;
 use std::path::PathBuf;
-use tempfile::TempDir;
+use tempfile::{Builder, TempDir};
 
 #[derive(Debug)]
 pub enum Error {
     Which(which::Error),
     IO(std::io::Error),
     Regex(regex::Error),
+    GenericError(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -30,6 +31,12 @@ impl From<regex::Error> for Error {
     }
 }
 
+impl From<String> for Error {
+    fn from(err: String) -> Self {
+        Self::GenericError(err)
+    }
+}
+
 pub struct Csm {
     pub home_dir: TempDir,
 }
@@ -37,7 +44,7 @@ pub struct Csm {
 impl Csm {
     pub fn new() -> Result<Csm, Error> {
         Ok(Self {
-            home_dir: TempDir::new()?,
+            home_dir: Builder::new().prefix("csm-").tempdir()?,
         })
     }
 
