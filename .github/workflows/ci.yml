@@ -25,7 +25,13 @@ jobs:
           rustflags: ""
           target: ${{ matrix.target }}
       - uses: mamba-org/setup-micromamba@v2
-      - run: cargo fmt --check
-      - run: cargo clippy
+        env:
+          ACTIONS_STEP_DEBUG: true
       - run: cargo test
+        if: always()
+      - run: cargo fmt --check
+        if: always()
+      - run: cargo clippy
+        if: always()
       - run: cargo build --release
+        if: always()
