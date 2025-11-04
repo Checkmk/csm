@@ -48,6 +48,43 @@ fn test_csm_env_info() -> Result<(), Error> {
     Ok(())
 }
 
+/// Test `csm env run`
+#[test]
+fn test_csm_env_run() -> Result<(), Error> {
+    let mut csm = common::Csm::new()?;
+    csm_env_create(&mut csm, "test_csm_env_run")?;
+    let args = if cfg!(windows) {
+        vec![
+            "env",
+            "run",
+            "-n",
+            "test_csm_env_run",
+            "--",
+            "pwsh",
+            "-Command",
+            "echo $env:CONDA_PROMPT_MODIFIER",
+        ]
+    } else {
+        vec![
+            "env",
+            "run",
+            "-n",
+            "test_csm_env_run",
+            "env",
+            "--",
+            "sh",
+            "-c",
+            "echo $CONDA_PROMPT_MODIFIER",
+        ]
+    };
+    csm.command()
+        .args(&args)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(test_csm_env_run)"));
+    Ok(())
+}
+
 /// Test that running a command like `csm env info` generates a `.mambarc` in
 /// the user's home directory.
 #[test]

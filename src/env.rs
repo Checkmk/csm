@@ -16,7 +16,7 @@ pub enum Subcommand {
     /// Deactivate an environment
     Deactivate,
     /// Run an executable in an environment
-    Run,
+    Run(RunArgs),
     /// ???
     Pack,
     /// ???
@@ -32,8 +32,23 @@ pub struct CreateArgs {
     /// If specified, the name of the environment. If not specified, csm will
     /// look to robotmk-env.yaml for a "name" field to use instead. As a last
     /// resort, the current directory name will be used
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "ENV_NAME")]
     name: Option<String>,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct RunArgs {
+    /// If specified, the name of the environment. If not specified, csm will
+    /// look to robotmk-env.yaml for a "name" field to use instead. As a last
+    /// resort, the current directory name will be used
+    #[arg(short, long, value_name = "ENV_NAME")]
+    name: Option<String>,
+    /// The command to run
+    #[arg(value_name = "COMMAND")]
+    command: String,
+    /// Arguments to pass to the command
+    #[arg(value_name = "ARGS")]
+    arguments: Vec<String>,
 }
 
 /// Contains the fields we need from a parsed `robotmk-env.yml` file.
@@ -50,9 +65,9 @@ fn parse_robotmk_env_yaml() -> Result<RobotmkEnv, std::io::Error> {
     serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
 }
 
-pub fn determine_env_name(args: CreateArgs) -> Option<String> {
+pub fn determine_env_name(explicit_name: Option<String>) -> Option<String> {
     // If someone gave an explicit --name, use that first.
-    if let Some(name) = args.name {
+    if let Some(name) = explicit_name {
         debug!("Using '{}' as env name, given by CLI argument", name);
         return Some(name);
     }
@@ -92,7 +107,7 @@ pub fn determine_env_name(args: CreateArgs) -> Option<String> {
 pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
     match subcommand {
         Subcommand::Create(args) => {
-            let Some(env_name) = determine_env_name(args) else {
+            let Some(env_name) = determine_env_name(args.name) else {
                 error!("No environment name could be determined. You can specify one with --name");
                 return ExitCode::FAILURE;
             };
@@ -112,6 +127,15 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
         }
         Subcommand::List => micromamba(&config, vec!["env", "list"]).exit_code(),
         Subcommand::Info => micromamba(&config, vec!["info"]).exit_code(),
+        Subcommand::Run(args) => {
+            let Some(env_name) = determine_env_name(args.name) else {
+                error!("No environment name could be determined. You can specify one with --name");
+                return ExitCode::FAILURE;
+            };
+            let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
+            micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
+            micromamba(&config, micromamba_args).exit_code()
+        }
         _ => {
             println!("{:?}", config);
             println!("{:?}", subcommand);
@@ -158,22 +182,14 @@ mod tests {
 
     #[test]
     fn test_determine_env_name_with_cli_arg() {
-        let args = CreateArgs {
-            name: Some("test-env".to_string()),
-        };
-
-        let result = determine_env_name(args);
+        let result = determine_env_name(Some("test-env".to_string()));
         assert_eq!(result, Some("test-env".to_string()));
     }
 
     #[test]
     fn test_determine_env_name_cli_arg_overrides_yaml() {
         run_in_temp_dir("csm_test_override", Some("name: yaml-env-name"), || {
-            let args = CreateArgs {
-                name: Some("cli-override".to_string()),
-            };
-
-            let result = determine_env_name(args);
+            let result = determine_env_name(Some("cli-override".to_string()));
             assert_eq!(result, Some("cli-override".to_string()));
         });
     }
@@ -202,8 +218,7 @@ mod tests {
 
         for (dir_name, yaml, expected) in test_cases {
             run_in_temp_dir(dir_name, yaml, || {
-                let args = CreateArgs { name: None };
-                let result = determine_env_name(args);
+                let result = determine_env_name(None);
                 assert_eq!(result.unwrap(), expected, "Failed case: {}", dir_name);
             });
         }
