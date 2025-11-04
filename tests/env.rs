@@ -94,3 +94,52 @@ fn test_csm_creates_mambarc() -> Result<(), Error> {
     let mambarc_path = csm.home_dir.path().join(".mambarc");
     Ok(std::fs::read_to_string(mambarc_path).map(|_| ())?)
 }
+
+/// Test determining the env name for `csm env create`.
+///
+/// 1. -n/--name overrides all
+/// 2. if a robotmk-env.yaml is in the directory and has `name:` use it
+/// 3. fall back to current directory name
+#[test]
+fn test_csm_env_create_env_name() -> Result<(), Error> {
+    let csm = common::Csm::new()?;
+    // No --name given, but the directory has a robotmk-env.yaml
+    csm.command()
+        .current_dir(common::tests_dir().join("micromamba-minimal"))
+        .args(vec!["-nv", "env", "create"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Using 'micromamba-minimal' as env name",
+        ))
+        .stderr(predicate::str::contains("found in robotmk-env.yaml"));
+
+    // robotmk-env.yaml exists, but name overridden with --name
+    csm.command()
+        .current_dir(common::tests_dir().join("micromamba-minimal"))
+        .args(vec!["-nv", "env", "create", "-n", "anothername"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Using 'anothername' as env name"))
+        .stderr(predicate::str::contains("given by CLI argument"));
+
+    let Some(std::path::Component::Normal(dirname)) = csm.home_dir.path().components().next_back()
+    else {
+        return Err("Cannot get test homedir name".to_string().into());
+    };
+
+    csm.command()
+        .current_dir(csm.home_dir.path())
+        .args(vec!["-nv", "env", "create"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(format!(
+            "Using '{}' as env name",
+            dirname.to_string_lossy()
+        )))
+        .stderr(predicate::str::contains(
+            "taken from current directory name",
+        ));
+
+    Ok(())
+}
