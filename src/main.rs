@@ -3,6 +3,7 @@ mod env;
 mod init;
 mod micromamba;
 mod robot;
+mod shell;
 
 use crate::csmrc::Config;
 use clap::{CommandFactory, Parser, Subcommand};
@@ -40,7 +41,7 @@ enum Command {
 
     /// Initialize shell environment for csm
     Init {
-        shell: Option<init::SupportedShell>,
+        shell: Option<shell::SupportedShell>,
         /// Generate the actual shell code to be evaluated
         #[arg(long)]
         code: bool,
