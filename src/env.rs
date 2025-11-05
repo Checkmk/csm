@@ -1,7 +1,7 @@
 use crate::csmrc::Config;
 use crate::micromamba::micromamba;
 
-use log::{debug, error};
+use log::{debug, error, info};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::path::Component;
@@ -135,6 +135,11 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
             micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
             micromamba(&config, micromamba_args).exit_code()
+        }
+        Subcommand::Activate => {
+            info!("testing");
+            println!("export CSM_TESTING=it_works");
+            ExitCode::SUCCESS
         }
         _ => {
             println!("{:?}", config);
