@@ -20,10 +20,13 @@ const PWSH_WRAPPER: &str = include_str!("../shell/csm.ps1");
 
 #[derive(Clone, Debug, ValueEnum)]
 pub enum SupportedShell {
+    #[value(aliases(["bash.exe"]))]
     Bash,
+    #[value(aliases(["fish.exe"]))]
     Fish,
-    #[value(alias("pwsh"))]
+    #[value(aliases(["pwsh", "pwsh.exe"]))]
     Powershell,
+    #[value(aliases(["zsh.exe"]))]
     Zsh,
 }
 

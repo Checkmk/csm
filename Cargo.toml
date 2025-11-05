@@ -3,6 +3,13 @@ name = "csm"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["__test_bash"]  # Don't assume devs have other shells installed
+__test_bash = []
+__test_fish = []
+__test_powershell = []
+__test_zsh = []
+
 [dependencies]
 bzip2 = "0.6.1"
 clap = { version = "4.5.50", features = ["derive", "wrap_help"] }
