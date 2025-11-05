@@ -6,7 +6,6 @@ mod robot;
 
 use crate::csmrc::Config;
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::aot::Shell;
 use log::{LevelFilter, debug, error, info, warn};
 use std::fs::File;
 use std::io::Write;
@@ -41,7 +40,7 @@ enum Command {
 
     /// Initialize shell environment for csm
     Init {
-        shell: Option<Shell>,
+        shell: Option<init::SupportedShell>,
         /// Generate the actual shell code to be evaluated
         #[arg(long)]
         code: bool,
