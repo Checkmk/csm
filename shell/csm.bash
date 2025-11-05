@@ -2,7 +2,7 @@
 export _CSM_SHELL=bash
 
 csm() {
-    CSM_BIN="$(command -v csm)"
+    CSM_BIN="$(type -P csm)"
     if [[ "$1" == "env" && ( "$2" == "activate"  || "$2" == "deactivate" ) ]]; then
         eval "$("$CSM_BIN" "$@")"
     else

@@ -143,3 +143,16 @@ fn test_csm_env_create_env_name() -> Result<(), Error> {
 
     Ok(())
 }
+
+/// Test `csm env activate` with no shell hook enabled.
+#[test]
+fn test_csm_env_activate_no_hook() -> Result<(), Error> {
+    common::Csm::new()?
+        .command()
+        .args(&["env", "activate"])
+        .env_clear()
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("See 'csm init' for information"));
+    Ok(())
+}

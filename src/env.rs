@@ -1,5 +1,6 @@
 use crate::csmrc::Config;
 use crate::micromamba::micromamba;
+use crate::shell::SupportedShell;
 
 use log::{debug, error, info};
 use serde::Deserialize;
@@ -137,8 +138,20 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             micromamba(&config, micromamba_args).exit_code()
         }
         Subcommand::Activate => {
-            info!("testing");
-            println!("export CSM_TESTING=it_works");
+            // TODO: handle env name similar to run/create
+
+            let Some(shell) = SupportedShell::from_csm_hook() else {
+                error!("Your shell does not appear to have the csm hook enabled");
+                error!("See 'csm init' for information on how to set up the hook");
+                return ExitCode::FAILURE;
+            };
+
+            info!("Activating...");
+
+            // NOTE: Anything to stdout here is *evaluated by the user's shell*
+            // Use the logging macros instead for user-facing output!
+            println!("{}", shell.set_env_var("CSM_TEST", "it_works"));
+            println!("{}", shell.set_env_var("CSM_ANOTHER", "it_works_too"));
             ExitCode::SUCCESS
         }
         _ => {
