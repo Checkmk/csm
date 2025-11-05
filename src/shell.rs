@@ -90,6 +90,24 @@ impl SupportedShell {
     pub fn detect() -> Option<Self> {
         Self::from_parent_process().or_else(Self::from_env)
     }
+
+    /// We expect the hook scripts to set $_CSM_SHELL, and we use this to know
+    /// which shell to generate code for in commands like `csm env activate`.
+    pub fn from_csm_hook() -> Option<Self> {
+        let env_csm_shell = std::env::var("_CSM_SHELL").ok()?;
+        Self::from_str(&env_csm_shell, false).ok()
+    }
+
+    pub fn set_env_var(&self, key: &str, value: &str) -> String {
+        // TODO: Probably here we can also export something like
+        //        _CSM_<KEY>_ORIG=<original value> so that we can easily restore
+        //        later on (e.g. for `csm env deactivate` or something).
+        match self {
+            Self::Bash | Self::Zsh => format!("export {}=\"{}\";", key, value),
+            Self::Fish => format!("set -g {} \"{}\"", key, value),
+            Self::Powershell => format!("$env:{} = \"{}\"", key, value),
+        }
+    }
 }
 
 pub struct ShellConfiguration {
