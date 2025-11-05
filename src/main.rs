@@ -1,10 +1,12 @@
 mod csmrc;
 mod env;
+mod init;
 mod micromamba;
 mod robot;
 
 use crate::csmrc::Config;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::aot::Shell;
 use log::{LevelFilter, debug, error, info, warn};
 use std::fs::File;
 use std::io::Write;
@@ -36,6 +38,14 @@ enum Command {
     /// Manage Robotmk robots
     #[command(subcommand)]
     Robot(robot::Subcommand),
+
+    /// Initialize shell environment for csm
+    Init {
+        shell: Option<Shell>,
+        /// Generate the actual shell code to be evaluated
+        #[arg(long)]
+        code: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -88,6 +98,10 @@ fn main() -> ExitCode {
     match cli.command {
         Command::Env(sub) => env::run(config, sub),
         Command::Robot(sub) => robot::run(config, sub),
+        Command::Init { shell, code } => {
+            let mut cmd = Cli::command();
+            init::run(config, shell, code, &mut cmd)
+        }
     }
 }
 
