@@ -7,15 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  ci:
-    strategy:
-      matrix:
-        include:
-          - image: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - image: windows-latest
-            target: x86_64-pc-windows-msvc
-    runs-on: ${{ matrix.image }}
+  linux:
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -23,10 +16,11 @@ jobs:
         with:
           components: clippy, rustfmt
           rustflags: ""
-          target: ${{ matrix.target }}
+          target: x86_64-unknown-linux-gnu
       - uses: mamba-org/setup-micromamba@v2
         env:
           ACTIONS_STEP_DEBUG: true
+      - run: sudo apt-get update && sudo apt-get install -y fish zsh
       - run: cargo test --all-features
         if: always()
       - run: cargo fmt --check
@@ -34,4 +28,26 @@ jobs:
       - run: cargo clippy
         if: always()
       - run: cargo build --release --all-features
+        if: always()
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+          rustflags: ""
+          target: x86_64-pc-windows-msvc
+      - uses: mamba-org/setup-micromamba@v2
+        env:
+          ACTIONS_STEP_DEBUG: true
+      - run: cargo test --features=__test_powershell,__test_bash
+        if: always()
+      - run: cargo fmt --check
+        if: always()
+      - run: cargo clippy
+        if: always()
+      - run: cargo build --release --features=__test_powershell,__test_bash
         if: always()
