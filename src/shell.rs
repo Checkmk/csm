@@ -9,7 +9,7 @@
 
 use clap::ValueEnum;
 use clap_complete::aot::Shell;
-use log::debug;
+use log::{debug, warn};
 use std::fmt;
 use std::path::PathBuf;
 use sysinfo::{ProcessesToUpdate, System};
@@ -102,15 +102,39 @@ impl SupportedShell {
         Self::from_str(&env_csm_shell, false).ok()
     }
 
-    pub fn set_env_var(&self, key: &str, value: &str) -> String {
-        // TODO: Probably here we can also export something like
-        //        _CSM_<KEY>_ORIG=<original value> so that we can easily restore
-        //        later on (e.g. for `csm env deactivate` or something).
+    fn env_var_codegen(&self, key: &str, value: &str) -> String {
         match self {
             Self::Bash | Self::Zsh => format!("export {}=\"{}\";", key, value),
-            Self::Fish => format!("set -g {} \"{}\"", key, value),
-            Self::Powershell => format!("$env:{} = \"{}\"", key, value),
+            Self::Fish => format!("set -g {} \"{}\";", key, value),
+            Self::Powershell => format!("$env:{} = \"{}\";", key, value),
         }
+    }
+
+    pub fn set_env_var(&self, key: &str, new_value: &str) -> String {
+        let mut out = String::new();
+
+        // Back up the existing value iff we haven't done so already.
+        let backup_key = format!("_CSM_{}_ORIG", key);
+        match std::env::var(&backup_key) {
+            Ok(_) | Err(std::env::VarError::NotUnicode(_)) => debug!(
+                "Refusing to override saved original env var {} for {}",
+                backup_key, key
+            ),
+            Err(std::env::VarError::NotPresent) => match std::env::var(key) {
+                Ok(val) => {
+                    debug!("Saving existing ${} to ${}", key, backup_key);
+                    out.push_str(&self.env_var_codegen(&backup_key, &val));
+                }
+                Err(std::env::VarError::NotPresent) => {
+                    debug!("No existing env var ${} found, not saving old value", key)
+                }
+                Err(std::env::VarError::NotUnicode(_)) => {
+                    warn!("Existing ${} was not valid utf-8", key)
+                }
+            },
+        }
+        out.push_str(&self.env_var_codegen(key, new_value));
+        out
     }
 }
 
