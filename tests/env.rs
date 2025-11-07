@@ -11,7 +11,7 @@ fn csm_env_create(csm: &mut common::Csm, name: &str) -> Result<(), Error> {
         .current_dir(common::tests_dir().join("micromamba-minimal"))
         .assert()
         .success()
-        .stdout(predicate::str::contains("Transaction finished"));
+        .stderr(predicate::str::contains("Done."));
     Ok(())
 }
 
