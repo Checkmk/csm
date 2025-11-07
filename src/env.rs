@@ -1,5 +1,5 @@
 use crate::csmrc::Config;
-use crate::micromamba::micromamba;
+use crate::micromamba::{MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
 use log::{debug, error, info};
@@ -112,6 +112,10 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                 error!("No environment name could be determined. You can specify one with --name");
                 return ExitCode::FAILURE;
             };
+            info!(
+                "Creating environment '{}' - this may take some time...",
+                env_name
+            );
             let result = micromamba(
                 &config,
                 vec![
@@ -123,11 +127,24 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                     &env_name,
                     "--yes",
                 ],
+                config.verbose,
             );
-            result.exit_code()
+            let rc = result.exit_code();
+            match result {
+                MicromambaResult::CapturedOutput(output) if rc != ExitCode::SUCCESS => {
+                    error!("Got a non-zero exit code from micromamba, dumping output:");
+                    error!("micromamba stdout:");
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+                    error!("micromamba stderr:");
+                    println!("{}", String::from_utf8_lossy(&output.stderr));
+                }
+                MicromambaResult::CapturedOutput(_) if rc == ExitCode::SUCCESS => info!("Done."),
+                _ => {}
+            }
+            rc
         }
-        Subcommand::List => micromamba(&config, vec!["env", "list"]).exit_code(),
-        Subcommand::Info => micromamba(&config, vec!["info"]).exit_code(),
+        Subcommand::List => micromamba(&config, vec!["env", "list"], true).exit_code(),
+        Subcommand::Info => micromamba(&config, vec!["info"], true).exit_code(),
         Subcommand::Run(args) => {
             let Some(env_name) = determine_env_name(args.name) else {
                 error!("No environment name could be determined. You can specify one with --name");
@@ -135,7 +152,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             };
             let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
             micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
-            micromamba(&config, micromamba_args).exit_code()
+            micromamba(&config, micromamba_args, true).exit_code()
         }
         Subcommand::Activate => {
             // TODO: handle env name similar to run/create

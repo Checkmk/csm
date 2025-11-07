@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, ExitStatus};
+use std::process::{Command, ExitCode, ExitStatus, Output};
 
 /// The result from trying to shell out to `micromamba`.
 ///
@@ -20,8 +20,11 @@ use std::process::{Command, ExitCode, ExitStatus};
 pub enum MicromambaResult {
     /// We were run in no-op mode, so we didn't actually call out to it
     Noop,
-    /// We were able to successfully call it and get a result
-    Ok(ExitStatus),
+    /// We were able to successfully call it and get a result, though we streamed
+    /// the output and did not save it.
+    StreamedOutput(ExitStatus),
+    /// We were able to successfully call it and get a result, capturing output.
+    CapturedOutput(Output),
     /// We were unable to find or create a working `micromamba`
     NotFound,
     /// We found a micromamba binary, but could not run it
@@ -30,11 +33,16 @@ pub enum MicromambaResult {
 
 impl MicromambaResult {
     pub fn exit_code(&self) -> ExitCode {
-        match self {
-            Self::Ok(exit_status) => exit_status
+        let to_code = |status: &ExitStatus| {
+            status
                 .code()
                 .map(|c| ExitCode::from(c as u8))
-                .unwrap_or(ExitCode::FAILURE),
+                .unwrap_or(ExitCode::FAILURE)
+        };
+
+        match self {
+            Self::StreamedOutput(exit_status) => to_code(exit_status),
+            Self::CapturedOutput(output) => to_code(&output.status),
             Self::Noop => ExitCode::SUCCESS,
             _ => ExitCode::FAILURE,
         }
@@ -102,7 +110,7 @@ fn block_on_child_exit(child: &mut std::process::Child) -> MicromambaResult {
     match child.wait() {
         Ok(exit_status) => {
             debug!("micromamba exited with status: {}", exit_status);
-            MicromambaResult::Ok(exit_status)
+            MicromambaResult::StreamedOutput(exit_status)
         }
         Err(e) => {
             error!("We found a micromamba binary, but failed to wait for it to run");
@@ -112,17 +120,32 @@ fn block_on_child_exit(child: &mut std::process::Child) -> MicromambaResult {
     }
 }
 
-fn exec_micromamba(cmd: &mut Command) -> MicromambaResult {
-    match cmd.spawn() {
-        Ok(mut child) => block_on_child_exit(&mut child),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            debug!("Could not run micromamba at specified path: {}", e);
-            MicromambaResult::NotFound
+fn exec_micromamba(cmd: &mut Command, stream_output: bool) -> MicromambaResult {
+    if stream_output {
+        match cmd.spawn() {
+            Ok(mut child) => block_on_child_exit(&mut child),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                debug!("Could not run micromamba at specified path: {}", e);
+                MicromambaResult::NotFound
+            }
+            Err(e) => {
+                error!("We found a micromamba binary, but failed to run it");
+                error!("Error was: {}", e);
+                MicromambaResult::CouldNotRun
+            }
         }
-        Err(e) => {
-            error!("We found a micromamba binary, but failed to run it");
-            error!("Error was: {}", e);
-            MicromambaResult::CouldNotRun
+    } else {
+        match cmd.output() {
+            Ok(output) => MicromambaResult::CapturedOutput(output),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                debug!("Could not run micromamba at specified path: {}", e);
+                MicromambaResult::NotFound
+            }
+            Err(e) => {
+                error!("We found a micromamba binary, but failed to run it");
+                error!("Error was: {}", e);
+                MicromambaResult::CouldNotRun
+            }
         }
     }
 }
@@ -144,7 +167,7 @@ fn exec_micromamba(cmd: &mut Command) -> MicromambaResult {
 /// - We *could* embed the micromamba binary in our binary (Windows or Linux
 ///   based on compile target) and write it to the user cache directory rather
 ///   than downloading it. But this inflates our binary size.
-pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
+pub fn micromamba(config: &Config, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
     let mut cmd = micromamba_at("micromamba", config, &args);
 
     if config.noop_mode {
@@ -154,8 +177,8 @@ pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
 
     // If we were able to get a result using micromamba found in $PATH, then
     // we're done.
-    match exec_micromamba(&mut cmd) {
-        ok @ MicromambaResult::Ok(_) => {
+    match exec_micromamba(&mut cmd, stream_output) {
+        ok @ (MicromambaResult::StreamedOutput(_) | MicromambaResult::CapturedOutput(_)) => {
             debug!("Ran micromamba found in $PATH");
             return ok;
         }
@@ -179,8 +202,8 @@ pub fn micromamba(config: &Config, args: Vec<&str>) -> MicromambaResult {
         }
     };
     let mut cmd = micromamba_at(&downloaded_path.to_string_lossy(), config, &args);
-    match exec_micromamba(&mut cmd) {
-        ok @ MicromambaResult::Ok(_) => {
+    match exec_micromamba(&mut cmd, stream_output) {
+        ok @ (MicromambaResult::StreamedOutput(_) | MicromambaResult::CapturedOutput(_)) => {
             debug!(
                 "Ran downloaded/cached micromamba at {}",
                 downloaded_path.display()

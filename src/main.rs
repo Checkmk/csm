@@ -76,6 +76,10 @@ fn main() -> ExitCode {
         config.noop_mode = true;
     }
 
+    if cli.verbose {
+        config.verbose = true;
+    }
+
     let Some(home) = std::env::home_dir() else {
         error!("Failed to determine home directory");
         return ExitCode::FAILURE;

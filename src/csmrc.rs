@@ -20,6 +20,12 @@ pub struct Config {
 
     /// If false, skip downloading micromamba even if needed (for testing).
     pub download_micromamba: bool,
+
+    /// (Internal) If true, the program is being run in verbose mode.
+    /// We do not support this being set from the configuration file, because
+    /// the configuration file is parsed after logging is initialized. The user
+    /// can technically do it, we won't error, but it won't have much effect.
+    pub verbose: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -30,6 +36,7 @@ impl Default for Config {
             noop_mode: false,
             cache_dir: None,
             download_micromamba: true,
+            verbose: false,
         }
     }
 }
