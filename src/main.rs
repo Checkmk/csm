@@ -64,22 +64,17 @@ fn main() -> ExitCode {
     env_logger_builder.format_timestamp(None);
     env_logger_builder.init();
 
-    let config = match Config::from_csmrc() {
-        Ok(config) => {
-            if cli.noop_mode {
-                Config {
-                    noop_mode: true,
-                    ..config
-                }
-            } else {
-                config
-            }
-        }
+    let mut config = match Config::from_csmrc() {
+        Ok(config) => config,
         Err(err) => {
             error!("Failed to parse .csmrc: {}", err);
             return ExitCode::FAILURE;
         }
     };
+
+    if cli.noop_mode {
+        config.noop_mode = true;
+    }
 
     let Some(home) = std::env::home_dir() else {
         error!("Failed to determine home directory");
