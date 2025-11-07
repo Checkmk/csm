@@ -110,7 +110,7 @@ fn test_csm_init_shell_hook_zsh() -> Result<(), Error> {
         .env_clear()
         .assert()
         .success()
-        .stdout(predicate::eq("bash\n")); // we share the same code for bash and zsh
+        .stdout(predicate::eq("zsh\n"));
     Ok(())
 }
 

@@ -1,7 +1,7 @@
-export _CSM_SHELL=bash
+export _CSM_SHELL=zsh
 
 csm() {
-    local CSM_BIN="$(type -P csm)"
+    local CSM_BIN="$(whence -p csm)"
     if [[ "$1" == "env" && ( "$2" == "activate"  || "$2" == "deactivate" ) ]]; then
         eval "$("$CSM_BIN" "$@")"
     else

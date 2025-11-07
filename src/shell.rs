@@ -17,6 +17,7 @@ use sysinfo::{ProcessesToUpdate, System};
 const BASH_WRAPPER: &str = include_str!("../shell/csm.bash");
 const FISH_WRAPPER: &str = include_str!("../shell/csm.fish");
 const PWSH_WRAPPER: &str = include_str!("../shell/csm.ps1");
+const ZSH_WRAPPER: &str = include_str!("../shell/csm.zsh");
 
 #[derive(Clone, Debug, ValueEnum)]
 pub enum SupportedShell {
@@ -140,7 +141,7 @@ impl ShellConfiguration {
             SupportedShell::Zsh => Self {
                 profile_file: "~/.zshrc",
                 init_command: "eval \"$(csm init zsh --code)\"",
-                wrapper: BASH_WRAPPER,
+                wrapper: ZSH_WRAPPER,
             },
         }
     }
