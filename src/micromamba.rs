@@ -2,6 +2,7 @@
 
 use crate::csmrc::Config;
 use log::{debug, error, info};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -84,6 +85,12 @@ impl std::fmt::Display for DownloadError {
             DownloadError::Reqwest(e) => write!(f, "Failed to download micromamba: {}", e),
         }
     }
+}
+
+#[derive(Deserialize)]
+pub struct MicromambaInfo {
+    #[serde(rename(deserialize = "env location"))]
+    pub env_location: String,
 }
 
 /// Return a [`Command`] ready to shell out to `micromamba` with the appropriate
@@ -319,4 +326,15 @@ fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
     }
 
     Err(DownloadError::BinNotInArchive)
+}
+
+/// Query micromamba to try to determine the path for an environment
+pub fn path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
+    let result = micromamba(config, vec!["info", "--name", name, "--json"], false);
+    let MicromambaResult::CapturedOutput(output) = result else {
+        return None;
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let info: MicromambaInfo = serde_json::from_str(&stdout).ok()?;
+    Some(info.env_location.into())
 }

@@ -3,6 +3,7 @@ mod common;
 use common::Error;
 
 use predicates::prelude::*;
+use which::which;
 
 /// Create an environment with `csm env create`.
 fn csm_env_create(csm: &mut common::Csm, name: &str) -> Result<(), Error> {
@@ -154,5 +155,42 @@ fn test_csm_env_activate_no_hook() -> Result<(), Error> {
         .assert()
         .failure()
         .stderr(predicate::str::contains("See 'csm init' for information"));
+    Ok(())
+}
+
+/// Activate an environment and call something in it, using bash.
+#[cfg(feature = "__test_bash")]
+#[test]
+fn csm_env_activate_bash() -> Result<(), Error> {
+    let mut csm = common::Csm::new()?;
+    let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
+    csm.ext_command(which("bash")?)
+        .arg("-c")
+        .arg(
+            "eval \"$(csm init bash --code)\" &&\
+             csm env activate -n csm_env_activate_bash &&\
+             robot --version",
+        )
+        .assert()
+        .code(251)
+        .stdout(predicate::str::is_match("^Robot Framework")?);
+    Ok(())
+}
+
+/// Activate an environment and call something in it, using powershell.
+#[cfg(feature = "__test_powershell")]
+#[test]
+fn csm_env_activate_powershell() -> Result<(), Error> {
+    let mut csm = common::Csm::new()?;
+    let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
+    csm.ext_command(which("pwsh")?)
+        .arg("-c")
+        .arg(format!(
+            "csm init powershell --code | Out-String | Invoke-Expression &&\
+             csm env activate -n csm_env_activate_bash &&\
+             robot --version",
+        ))
+        .assert()
+        .stdout(predicate::str::is_match("^Robot Framework")?);
     Ok(())
 }

@@ -1,5 +1,5 @@
 use crate::csmrc::Config;
-use crate::micromamba::{MicromambaResult, micromamba};
+use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
 use log::{debug, error, info};
@@ -11,11 +11,11 @@ use std::process::ExitCode;
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
     /// Create an environment
-    Create(CreateArgs),
+    Create(CommonEnvArgs),
     /// Activate an environment
-    Activate,
+    Activate(CommonEnvArgs),
     /// Deactivate an environment
-    Deactivate,
+    Deactivate(CommonEnvArgs),
     /// Run an executable in an environment
     Run(RunArgs),
     /// ???
@@ -29,7 +29,7 @@ pub enum Subcommand {
 }
 
 #[derive(Debug, clap::Args)]
-pub struct CreateArgs {
+pub struct CommonEnvArgs {
     /// If specified, the name of the environment. If not specified, csm will
     /// look to robotmk-env.yaml for a "name" field to use instead. As a last
     /// resort, the current directory name will be used
@@ -154,21 +154,40 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
             micromamba(&config, micromamba_args, true).exit_code()
         }
-        Subcommand::Activate => {
-            // TODO: handle env name similar to run/create
-
+        Subcommand::Activate(args) => {
             let Some(shell) = SupportedShell::from_csm_hook() else {
                 error!("Your shell does not appear to have the csm hook enabled");
                 error!("See 'csm init' for information on how to set up the hook");
                 return ExitCode::FAILURE;
             };
 
-            info!("Activating...");
+            let Some(env_name) = determine_env_name(args.name) else {
+                error!("No environment name could be determined. You can specify one with --name");
+                return ExitCode::FAILURE;
+            };
+
+            info!("Activating environment '{}'...", env_name);
 
             // NOTE: Anything to stdout here is *evaluated by the user's shell*
             // Use the logging macros instead for user-facing output!
-            println!("{}", shell.set_env_var("CSM_TEST", "it_works"));
-            println!("{}", shell.set_env_var("CSM_ANOTHER", "it_works_too"));
+
+            // Start by adding the mamba prefix bin to PATH
+            let Some(mut env_path) = micromamba::path_for_env(&config, &env_name) else {
+                error!("Could not determine path for environment '{}'", env_name);
+                return ExitCode::FAILURE;
+            };
+            let bin = if cfg!(windows) { "Scripts" } else { "bin" };
+            env_path.push(bin);
+            println!("{}", shell.prepend_path(&env_path));
+
+            // And a few conda-specific vars
+            println!("{}", shell.set_env_var("CONDA_DEFAULT_ENV", &env_name));
+            println!(
+                "{}",
+                shell.set_env_var("CONDA_PREFIX", &env_path.to_string_lossy())
+            );
+            println!("{}", shell.set_env_var("CONDA_SHLVL", "1"));
+
             ExitCode::SUCCESS
         }
         _ => {
