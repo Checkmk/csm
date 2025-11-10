@@ -11,7 +11,7 @@ use clap::ValueEnum;
 use clap_complete::aot::Shell;
 use log::{debug, warn};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use sysinfo::{ProcessesToUpdate, System};
 
 const BASH_WRAPPER: &str = include_str!("../shell/csm.bash");
@@ -102,6 +102,21 @@ impl SupportedShell {
         Self::from_str(&env_csm_shell, false).ok()
     }
 
+    /// The $PATH syntax is also shell-dependent; this function provides a way
+    /// prepend a directory to it for the given shell.
+    pub fn prepend_path(&self, path: &Path) -> String {
+        let str_path = path.to_string_lossy();
+        match self {
+            Self::Bash | Self::Fish | Self::Zsh => {
+                self.set_env_var("PATH", format!("{}:$PATH", str_path).as_ref())
+            }
+            Self::Powershell => self.set_env_var(
+                "PATH",
+                format!("{}$([IO.Path]::PathSeparator)$env:PATH", str_path).as_ref(),
+            ),
+        }
+    }
+
     fn env_var_codegen(&self, key: &str, value: &str) -> String {
         match self {
             Self::Bash | Self::Zsh => format!("export {}=\"{}\";", key, value),
@@ -189,5 +204,35 @@ You could run the following command to add it automatically:
             self.profile_file,
             self.persist_command()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_supportedshell_prepend_path() {
+        let test_path = PathBuf::from("/tmp/testing");
+        assert!(
+            SupportedShell::Bash
+                .prepend_path(&test_path)
+                .ends_with(";export PATH=\"/tmp/testing:$PATH\";")
+        );
+        assert!(
+            SupportedShell::Fish
+                .prepend_path(&test_path)
+                .ends_with(";set -g PATH \"/tmp/testing:$PATH\";")
+        );
+        assert!(
+            SupportedShell::Zsh
+                .prepend_path(&test_path)
+                .ends_with(";export PATH=\"/tmp/testing:$PATH\";")
+        );
+        assert!(
+            SupportedShell::Powershell
+                .prepend_path(&test_path)
+                .ends_with(";$env:PATH = \"/tmp/testing$([IO.Path]::PathSeparator)$env:PATH\";")
+        );
     }
 }

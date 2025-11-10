@@ -1,6 +1,6 @@
 #![allow(dead_code)] // https://github.com/rust-lang/rust/issues/46379
 
-use assert_cmd::cargo::cargo_bin_cmd;
+use assert_cmd::cargo::{self, cargo_bin_cmd};
 use assert_cmd::cmd::Command;
 use std::path::PathBuf;
 use tempfile::{Builder, TempDir};
@@ -48,11 +48,39 @@ impl Csm {
         })
     }
 
-    pub fn command(&self) -> Command {
-        let mut command = cargo_bin_cmd!();
-        // Avoid reading real .csmrc
+    /// Try to isolate calls to csm and micromamba from the actual system as
+    /// much as possible, even if the user running the test has some env vars
+    /// already set.
+    fn prepare_command(&self, command: &mut Command) {
         command.env("HOME", self.home_dir.path());
         command.env("USERPROFILE", self.home_dir.path());
+        command.env_remove("CONDA_PREFIX");
+        command.env_remove("MAMBA_ROOT_PREFIX");
+    }
+
+    pub fn command(&self) -> Command {
+        let mut command = cargo_bin_cmd!();
+        self.prepare_command(&mut command);
+        command
+    }
+
+    pub fn ext_command(&self, bin: PathBuf) -> Command {
+        let mut command = Command::new(bin);
+        self.prepare_command(&mut command);
+
+        // Add csm into $PATH, in case we want to use it from a sh -c or similar
+        let csm_path = cargo::cargo_bin!();
+        let csm_bin_dir = csm_path
+            .parent()
+            .expect("Cannot get csm binary directory")
+            .to_string_lossy()
+            .replace("\\", "/");
+        let separator = if cfg!(windows) { ";" } else { ":" };
+        let path = match std::env::var("PATH") {
+            Ok(path) => format!("{}{}{}", path, separator, csm_bin_dir),
+            Err(_) => csm_bin_dir,
+        };
+        command.env("PATH", path);
 
         command
     }
