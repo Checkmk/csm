@@ -117,7 +117,7 @@ impl SupportedShell {
         let backup_key = format!("_CSM_{}_ORIG", key);
         match std::env::var(&backup_key) {
             Ok(_) | Err(std::env::VarError::NotUnicode(_)) => debug!(
-                "Refusing to override saved original env var {} for {}",
+                "Refusing to override saved original env var ${} for ${}",
                 backup_key, key
             ),
             Err(std::env::VarError::NotPresent) => match std::env::var(key) {
