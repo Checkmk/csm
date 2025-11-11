@@ -15,7 +15,7 @@ pub enum Subcommand {
     /// Activate an environment
     Activate(CommonEnvArgs),
     /// Deactivate an environment
-    Deactivate(CommonEnvArgs),
+    Deactivate,
     /// Run an executable in an environment
     Run(RunArgs),
     /// ???
@@ -188,6 +188,18 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             );
             println!("{}", shell.set_env_var("CONDA_SHLVL", "1"));
 
+            ExitCode::SUCCESS
+        }
+        Subcommand::Deactivate => {
+            let Some(shell) = SupportedShell::from_csm_hook() else {
+                error!("Your shell does not appear to have the csm hook enabled");
+                error!("See 'csm init' for information on how to set up the hook");
+                return ExitCode::FAILURE;
+            };
+            println!("{}", shell.restore_and_unset_env_var("PATH"));
+            println!("{}", shell.restore_and_unset_env_var("CONDA_DEFAULT_ENV"));
+            println!("{}", shell.restore_and_unset_env_var("CONDA_PREFIX"));
+            println!("{}", shell.restore_and_unset_env_var("CONDA_SHLVL"));
             ExitCode::SUCCESS
         }
         _ => {
