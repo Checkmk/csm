@@ -151,6 +151,52 @@ impl SupportedShell {
         out.push_str(&self.env_var_codegen(key, new_value));
         out
     }
+
+    pub fn unset_env_var(&self, key: &str) -> String {
+        match self {
+            Self::Bash | Self::Zsh => format!("unset {};", key),
+            Self::Fish => format!("set -e {};", key),
+            Self::Powershell => format!("Remove-Item Env:{};", key),
+        }
+    }
+
+    /// Emit the shell code to restore an environment variable that was backed
+    /// up to $_CSM_<name>_ORIG by `set_env_var()`. If there was no matching
+    /// backup variable found, return None.
+    ///
+    /// Invalid utf-8 backup variables are treated as not present.
+    pub fn restore_env_var(&self, key: &str) -> Option<String> {
+        let backup_key = format!("_CSM_{}_ORIG", key);
+        match std::env::var(&backup_key) {
+            Ok(orig_value) => {
+                debug!("Restoring original value of ${} from ${}", key, backup_key);
+                Some(self.set_env_var(key, &orig_value))
+            }
+            Err(std::env::VarError::NotPresent) => {
+                debug!("No original value for ${} found in ${}", key, backup_key);
+                None
+            }
+            Err(std::env::VarError::NotUnicode(_)) => {
+                warn!(
+                    "Original value for ${} in ${} was not valid utf-8",
+                    key, backup_key
+                );
+                None
+            }
+        }
+    }
+
+    /// Emit the shell code to restore an environment variable that was backed
+    /// up, and then unset the backup variable.
+    pub fn restore_and_unset_env_var(&self, key: &str) -> String {
+        let mut out = String::new();
+        if let Some(code) = self.restore_env_var(key) {
+            out.push_str(&code);
+        }
+        let backup_key = format!("_CSM_{}_ORIG", key);
+        out.push_str(&self.unset_env_var(&backup_key));
+        out
+    }
 }
 
 pub struct ShellConfiguration {
@@ -234,5 +280,29 @@ mod tests {
                 .prepend_path(&test_path)
                 .ends_with(";$env:PATH = \"/tmp/testing$([IO.Path]::PathSeparator)$env:PATH\";")
         );
+    }
+
+    #[test]
+    fn test_supportedshell_restore_env_var() {
+        temp_env::with_var("_CSM_TEST_VAR_ORIG", Some("a value"), || {
+            assert_eq!(
+                SupportedShell::Bash.restore_env_var("TEST_VAR").unwrap(),
+                "export TEST_VAR=\"a value\";"
+            );
+            assert_eq!(
+                SupportedShell::Fish.restore_env_var("TEST_VAR").unwrap(),
+                "set -g TEST_VAR \"a value\";"
+            );
+            assert_eq!(
+                SupportedShell::Zsh.restore_env_var("TEST_VAR").unwrap(),
+                "export TEST_VAR=\"a value\";"
+            );
+            assert_eq!(
+                SupportedShell::Powershell
+                    .restore_env_var("TEST_VAR")
+                    .unwrap(),
+                "$env:TEST_VAR = \"a value\";"
+            );
+        });
     }
 }
