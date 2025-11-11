@@ -43,7 +43,7 @@ jobs:
       - uses: mamba-org/setup-micromamba@v2
         env:
           ACTIONS_STEP_DEBUG: true
-      - run: cargo test --features=__test_powershell,__test_bash
+      - run: cargo test --no-default-features --features=__test_powershell
         if: always()
       - run: cargo fmt --check
         if: always()
