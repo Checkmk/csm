@@ -56,6 +56,7 @@ impl Csm {
         command.env("USERPROFILE", self.home_dir.path());
         command.env_remove("CONDA_PREFIX");
         command.env_remove("MAMBA_ROOT_PREFIX");
+        command.current_dir(self.home_dir.path());
     }
 
     pub fn command(&self) -> Command {

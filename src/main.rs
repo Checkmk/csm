@@ -10,7 +10,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use log::{LevelFilter, debug, error, info, warn};
 use std::fmt;
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
 
