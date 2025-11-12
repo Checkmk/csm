@@ -26,6 +26,10 @@ pub struct Config {
     /// the configuration file is parsed after logging is initialized. The user
     /// can technically do it, we won't error, but it won't have much effect.
     pub verbose: bool,
+
+    /// If true, skip checking for LongPaths support on Windows, and never try
+    /// to set it.
+    pub skip_longpaths_check: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -37,6 +41,7 @@ impl Default for Config {
             cache_dir: None,
             download_micromamba: true,
             verbose: false,
+            skip_longpaths_check: false,
         }
     }
 }
