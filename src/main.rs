@@ -8,8 +8,9 @@ mod shell;
 use crate::csmrc::Config;
 use clap::{CommandFactory, Parser, Subcommand};
 use log::{LevelFilter, debug, error, info, warn};
+use std::fmt;
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -46,6 +47,28 @@ enum Command {
         #[arg(long)]
         code: bool,
     },
+}
+
+trait CSMResult {
+    fn finish(&self) -> ExitCode;
+}
+
+impl CSMResult for ExitCode {
+    fn finish(&self) -> Self {
+        *self
+    }
+}
+
+impl<T, E: fmt::Display> CSMResult for Result<T, E> {
+    fn finish(&self) -> ExitCode {
+        match self {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(e) => {
+                error!("{}", e);
+                ExitCode::FAILURE
+            }
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -95,11 +118,11 @@ fn main() -> ExitCode {
     }
 
     match cli.command {
-        Command::Env(sub) => env::run(config, sub),
-        Command::Robot(sub) => robot::run(config, sub),
+        Command::Env(sub) => env::run(config, sub).finish(),
+        Command::Robot(sub) => robot::run(config, sub).finish(),
         Command::Init { shell, code } => {
             let mut cmd = Cli::command();
-            init::run(config, shell, code, &mut cmd)
+            init::run(config, shell, code, &mut cmd).finish()
         }
     }
 }
