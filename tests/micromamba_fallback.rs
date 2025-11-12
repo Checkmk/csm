@@ -11,7 +11,7 @@ use which::which;
 fn test_micromamba_in_path_success() -> Result<(), Error> {
     common::Csm::new()?
         .command()
-        .args(&["--verbose", "env", "create", "--name", "test-env"])
+        .args(["--verbose", "env", "create", "--name", "test-env"])
         .assert()
         .failure() // no robotmk-env.yaml, so micromamba fails
         .stderr(predicate::str::contains("Ran micromamba found in $PATH"));
@@ -31,9 +31,9 @@ fn test_micromamba_in_path_cannot_be_run() -> Result<(), Error> {
     };
     fs::write(&micromamba_path, "not an executable").unwrap();
 
-    let mut cmd = csm.command();
-    cmd.env("PATH", csm.home_dir.path())
-        .args(&["--verbose", "env", "create", "--name", "test-env"])
+    csm.command()
+        .env("PATH", csm.home_dir.path())
+        .args(["--verbose", "env", "create", "--name", "test-env"])
         .assert()
         .failure()
         .stderr(predicate::str::contains(
@@ -63,9 +63,9 @@ fn test_micromamba_fallback_to_cache_success() -> Result<(), Error> {
     };
     fs::copy(which("micromamba")?, cache_dir.join(binary_name))?;
 
-    let mut cmd = csm.command();
-    cmd.env("PATH", csm.home_dir.path()) // Something without micromamba
-        .args(&["--verbose", "env", "create", "--name", "test-env"])
+    csm.command()
+        .env("PATH", csm.home_dir.path()) // Something without micromamba
+        .args(["--verbose", "env", "create", "--name", "test-env"])
         .assert()
         .failure() // no robotmk-env.yaml, so micromamba fails
         .stderr(predicate::str::contains(
@@ -89,9 +89,9 @@ fn test_micromamba_fallback_to_download() -> Result<(), Error> {
     );
     csm.write_csmrc(&config)?;
 
-    let mut cmd = csm.command();
-    cmd.env("PATH", csm.home_dir.path()) // Something without micromamba
-        .args(&["--verbose", "env", "create", "--name", "test-env"])
+    csm.command()
+        .env("PATH", csm.home_dir.path()) // Something without micromamba
+        .args(["--verbose", "env", "create", "--name", "test-env"])
         .assert()
         .failure() // Should fail because downloads are disabled
         .stderr(predicate::str::contains(
@@ -106,7 +106,7 @@ fn test_micromamba_fallback_to_download() -> Result<(), Error> {
 fn test_noop_mode() -> Result<(), Error> {
     common::Csm::new()?
         .command()
-        .args(&["--verbose", "--noop", "env", "create", "--name", "test-env"])
+        .args(["--verbose", "--noop", "env", "create", "--name", "test-env"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Would run:"));

@@ -1,11 +1,9 @@
-mod csmrc;
-mod env;
-mod init;
-mod micromamba;
-mod robot;
-mod shell;
+use csm::csmrc::Config;
+use csm::env;
+use csm::init;
+use csm::robot;
+use csm::shell;
 
-use crate::csmrc::Config;
 use clap::{CommandFactory, Parser, Subcommand};
 use log::{LevelFilter, debug, error, info, warn};
 use std::fmt;
