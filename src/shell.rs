@@ -156,7 +156,8 @@ impl SupportedShell {
         match self {
             Self::Bash | Self::Zsh => format!("unset {};", key),
             Self::Fish => format!("set -e {};", key),
-            Self::Powershell => format!("Remove-Item Env:{};", key),
+            // Powershell will complain if the env var doesn't exist - but we don't care.
+            Self::Powershell => format!("Remove-Item Env:{} -ErrorAction SilentlyContinue;", key),
         }
     }
 
