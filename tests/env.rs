@@ -3,12 +3,11 @@ mod common;
 use common::Error;
 
 use predicates::prelude::*;
-use which::which;
 
 /// Create an environment with `csm env create`.
 fn csm_env_create(csm: &mut common::Csm, name: &str) -> Result<(), Error> {
     csm.command()
-        .args(&["env", "create", "-n", name])
+        .args(["env", "create", "-n", name])
         .current_dir(common::tests_dir().join("micromamba-minimal"))
         .assert()
         .success()
@@ -29,7 +28,7 @@ fn test_csm_env_list() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
     csm_env_create(&mut csm, "test_csm_env_list")?;
     csm.command()
-        .args(&["env", "list"])
+        .args(["env", "list"])
         .assert()
         .success()
         .stdout(predicate::str::is_match("Name.*Active.*Path")?)
@@ -42,7 +41,7 @@ fn test_csm_env_list() -> Result<(), Error> {
 fn test_csm_env_info() -> Result<(), Error> {
     common::Csm::new()?
         .command()
-        .args(&["env", "info"])
+        .args(["env", "info"])
         .assert()
         .success()
         .stdout(predicate::str::contains("populated config files : "));
@@ -91,7 +90,7 @@ fn test_csm_env_run() -> Result<(), Error> {
 #[test]
 fn test_csm_creates_mambarc() -> Result<(), Error> {
     let csm = common::Csm::new()?;
-    csm.command().args(&["env", "info"]).assert().success();
+    csm.command().args(["env", "info"]).assert().success();
     let mambarc_path = csm.home_dir.path().join(".mambarc");
     Ok(std::fs::read_to_string(mambarc_path).map(|_| ())?)
 }
@@ -150,7 +149,7 @@ fn test_csm_env_create_env_name() -> Result<(), Error> {
 fn test_csm_env_activate_no_hook() -> Result<(), Error> {
     common::Csm::new()?
         .command()
-        .args(&["env", "activate"])
+        .args(["env", "activate"])
         .env_clear()
         .assert()
         .failure()
@@ -167,29 +166,29 @@ fn csm_env_activate_deactivate_bash() -> Result<(), Error> {
     let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
 
     // activate
-    csm.ext_command(which("bash")?)
-        .arg("-c")
-        .arg(
-            "eval \"$(csm init bash --code)\" &&\
+    csm.run_script(
+        "bash",
+        "eval \"$(csm init bash --code)\" &&\
              csm env activate -n csm_env_activate_bash &&\
              robot --version",
-        )
-        .assert()
-        .code(251)
-        .stdout(predicate::str::is_match("^Robot Framework")?);
+        ".sh",
+    )?
+    .assert()
+    .code(251)
+    .stdout(predicate::str::is_match("^Robot Framework")?);
 
     // deactivate
-    csm.ext_command(which("bash")?)
-        .arg("-c")
-        .arg(
-            "eval \"$(csm init bash --code)\" &&\
+    csm.run_script(
+        "bash",
+        "eval \"$(csm init bash --code)\" &&\
              csm env activate -n csm_env_activate_bash &&\
              csm env deactivate &&\
              robot --version",
-        )
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("command not found"));
+        ".sh",
+    )?
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("command not found"));
     Ok(())
 }
 
@@ -202,29 +201,28 @@ fn csm_env_activate_deactivate_powershell() -> Result<(), Error> {
     let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
 
     // activate
-    csm.ext_command(which("pwsh")?)
-        .arg("-c")
-        .arg(format!(
-            "csm init powershell --code | Out-String | Invoke-Expression &&\
+    csm.run_script(
+        "pwsh",
+        "csm init powershell --code | Out-String | Invoke-Expression &&\
              csm env activate -n csm_env_activate_bash &&\
              robot --version",
-        ))
-        .assert()
-        .stdout(predicate::str::is_match("^Robot Framework")?);
+        ".ps1",
+    )?
+    .assert()
+    .stdout(predicate::str::is_match("^Robot Framework")?);
 
     // deactivate
-    csm.ext_command(which("pwsh")?)
-        .arg("-c")
-        .arg(format!(
-            "csm init powershell --code | Out-String | Invoke-Expression &&\
+    csm.run_script(
+        "pwsh",
+        "csm init powershell --code | Out-String | Invoke-Expression &&\
              csm env activate -n csm_env_activate_bash &&\
              csm env deactivate &&\
              robot --version",
-        ))
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "not recognized as a name of a cmdlet",
-        ));
+        ".ps1",
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "not recognized as a name of a cmdlet",
+    ));
     Ok(())
 }
