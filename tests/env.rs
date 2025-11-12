@@ -159,11 +159,14 @@ fn test_csm_env_activate_no_hook() -> Result<(), Error> {
 }
 
 /// Activate an environment and call something in it, using bash.
+/// Then deactivate it and ensure that thing was removed from PATH.
 #[cfg(feature = "__test_bash")]
 #[test]
-fn csm_env_activate_bash() -> Result<(), Error> {
+fn csm_env_activate_deactivate_bash() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
     let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
+
+    // activate
     csm.ext_command(which("bash")?)
         .arg("-c")
         .arg(
@@ -174,15 +177,31 @@ fn csm_env_activate_bash() -> Result<(), Error> {
         .assert()
         .code(251)
         .stdout(predicate::str::is_match("^Robot Framework")?);
+
+    // deactivate
+    csm.ext_command(which("bash")?)
+        .arg("-c")
+        .arg(
+            "eval \"$(csm init bash --code)\" &&\
+             csm env activate -n csm_env_activate_bash &&\
+             csm env deactivate &&\
+             robot --version",
+        )
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("command not found"));
     Ok(())
 }
 
 /// Activate an environment and call something in it, using powershell.
+/// Then deactivate it and ensure that thing was removed from PATH.
 #[cfg(feature = "__test_powershell")]
 #[test]
-fn csm_env_activate_powershell() -> Result<(), Error> {
+fn csm_env_activate_deactivate_powershell() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
     let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
+
+    // activate
     csm.ext_command(which("pwsh")?)
         .arg("-c")
         .arg(format!(
@@ -192,5 +211,20 @@ fn csm_env_activate_powershell() -> Result<(), Error> {
         ))
         .assert()
         .stdout(predicate::str::is_match("^Robot Framework")?);
+
+    // deactivate
+    csm.ext_command(which("pwsh")?)
+        .arg("-c")
+        .arg(format!(
+            "csm init powershell --code | Out-String | Invoke-Expression &&\
+             csm env activate -n csm_env_activate_bash &&\
+             csm env deactivate &&\
+             robot --version",
+        ))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "not recognized as a name of a cmdlet",
+        ));
     Ok(())
 }
