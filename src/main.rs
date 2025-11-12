@@ -11,6 +11,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
+#[cfg(windows)]
+use windows_registry::LOCAL_MACHINE;
 
 #[derive(Parser, Debug)]
 #[command(version)]
@@ -115,6 +117,35 @@ fn main() -> ExitCode {
         );
     }
 
+    #[cfg(windows)]
+    if !config.skip_longpaths_check
+        && let Err(e) = windows_set_longpaths()
+    {
+        warn!(
+            "Error while checking or enabling LongPaths for Windows: {}",
+            e
+        );
+        eprintln!(
+            "Continuing without LongPaths support can have unwanted effects and is not recommended."
+        );
+        eprint!("Continue anyway? [y/N]: ");
+        let mut input = String::new();
+        if std::io::stdin().read_line(&mut input).is_err() {
+            error!("Failed to get user input");
+            return ExitCode::FAILURE;
+        }
+        match input.trim() {
+            "y" | "Y" | "yes" => info!(
+                "You can add the line 'skip_longpaths_check: true' to {} to skip this prompt in the future",
+                home.join(".csmrc").display()
+            ),
+            _ => {
+                error!("Exiting.");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+
     match cli.command {
         Command::Env(sub) => env::run(config, sub).finish(),
         Command::Robot(sub) => robot::run(config, sub).finish(),
@@ -147,4 +178,30 @@ fn create_mambarc(config: &Config, home: &Path) -> std::io::Result<()> {
         Err(e) => return Err(e),
     }
     Ok(())
+}
+
+/// On windows, check if LongPaths are enabled in the registry, and enable them
+/// if they are not.
+///
+/// The *check* is done with read-only access to the registry path and should
+/// not require administrator privileges. The *modification* likely requires
+/// administrative privileges and we re-open the key with write access for it.
+#[cfg(windows)]
+fn windows_set_longpaths() -> windows_registry::Result<()> {
+    let reg_path = r"SYSTEM\CurrentControlSet\Control\FileSystem";
+    let ro_key = LOCAL_MACHINE.open(reg_path)?;
+    match ro_key.get_u32("LongPathsEnabled") {
+        Ok(1) => {
+            debug!("Windows LongPathsEnabled setting is already enabled");
+            Ok(())
+        }
+        Ok(_) => {
+            info!(
+                "Enabling LongPaths in the registry, this may require administrative permissions"
+            );
+            let rw_key = LOCAL_MACHINE.create(reg_path)?;
+            rw_key.set_u32("LongPathsEnabled", 1)
+        }
+        e @ Err(_) => e.map(|_| ()),
+    }
 }
