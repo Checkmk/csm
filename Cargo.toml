@@ -3,6 +3,9 @@ name = "csm"
 version = "0.1.0"
 edition = "2024"
 
+[lints.clippy]
+all = "deny"
+
 [features]
 default = ["__test_bash"]  # Don't assume devs have other shells installed
 __test_bash = []
