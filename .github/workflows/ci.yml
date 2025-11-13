@@ -47,7 +47,7 @@ jobs:
         if: always()
       - run: cargo fmt --check
         if: always()
-      - run: cargo clippy
+      - run: cargo clippy --all-targets
         if: always()
       - run: cargo build --release --features=__test_powershell,__test_bash
         if: always()
