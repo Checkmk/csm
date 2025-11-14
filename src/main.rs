@@ -1,3 +1,4 @@
+use csm::CSMResult;
 use csm::csmrc::Config;
 use csm::env;
 use csm::init;
@@ -6,7 +7,6 @@ use csm::shell;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use log::{LevelFilter, debug, error, info, warn};
-use std::fmt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -47,28 +47,6 @@ enum Command {
         #[arg(long)]
         code: bool,
     },
-}
-
-trait CSMResult {
-    fn finish(&self) -> ExitCode;
-}
-
-impl CSMResult for ExitCode {
-    fn finish(&self) -> Self {
-        *self
-    }
-}
-
-impl<T, E: fmt::Display> CSMResult for Result<T, E> {
-    fn finish(&self) -> ExitCode {
-        match self {
-            Ok(_) => ExitCode::SUCCESS,
-            Err(e) => {
-                error!("{}", e);
-                ExitCode::FAILURE
-            }
-        }
-    }
 }
 
 fn main() -> ExitCode {
