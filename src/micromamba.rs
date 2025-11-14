@@ -338,3 +338,9 @@ pub fn path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
     let info: MicromambaInfo = serde_json::from_str(&stdout).ok()?;
     Some(info.env_location.into())
 }
+
+/// Return an OS-specific path to where micromamba stores (most?) binaries.
+pub fn bin_path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
+    let os_specific_bin = if cfg!(windows) { "Scripts" } else { "bin" };
+    path_for_env(config, name).map(|p| p.join(os_specific_bin))
+}
