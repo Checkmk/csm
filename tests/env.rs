@@ -163,13 +163,13 @@ fn test_csm_env_activate_no_hook() -> Result<(), Error> {
 #[test]
 fn csm_env_activate_deactivate_bash() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
-    let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
+    let _ = csm_env_create(&mut csm, "csm_env_activate_deactivate_bash");
 
     // activate
     csm.run_script(
         "bash",
         "eval \"$(csm init bash --code)\" &&\
-             csm env activate -n csm_env_activate_bash &&\
+             csm env activate -n csm_env_activate_deactivate_bash &&\
              robot --version",
         ".sh",
     )?
@@ -181,7 +181,7 @@ fn csm_env_activate_deactivate_bash() -> Result<(), Error> {
     csm.run_script(
         "bash",
         "eval \"$(csm init bash --code)\" &&\
-             csm env activate -n csm_env_activate_bash &&\
+             csm env activate -n csm_env_activate_deactivate_bash &&\
              csm env deactivate &&\
              robot --version",
         ".sh",
@@ -198,13 +198,13 @@ fn csm_env_activate_deactivate_bash() -> Result<(), Error> {
 #[test]
 fn csm_env_activate_deactivate_powershell() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
-    let _ = csm_env_create(&mut csm, "csm_env_activate_bash");
+    let _ = csm_env_create(&mut csm, "csm_env_activate_deactivate_powershell");
 
     // activate
     csm.run_script(
         "pwsh",
         "csm init powershell --code | Out-String | Invoke-Expression &&\
-             csm env activate -n csm_env_activate_bash &&\
+             csm env activate -n csm_env_activate_deactivate_powershell &&\
              robot --version",
         ".ps1",
     )?
@@ -215,7 +215,7 @@ fn csm_env_activate_deactivate_powershell() -> Result<(), Error> {
     csm.run_script(
         "pwsh",
         "csm init powershell --code | Out-String | Invoke-Expression &&\
-             csm env activate -n csm_env_activate_bash &&\
+             csm env activate -n csm_env_activate_deactivate_powershell &&\
              csm env deactivate &&\
              robot --version",
         ".ps1",
@@ -224,5 +224,61 @@ fn csm_env_activate_deactivate_powershell() -> Result<(), Error> {
     .stderr(predicate::str::contains(
         "not recognized as a name of a cmdlet",
     ));
+    Ok(())
+}
+
+/// Create an environment and then test that it can be packed and unpacked with
+/// `csm env pack` and `csm env unpack`.
+#[test]
+fn test_csm_env_pack_unpack() -> Result<(), Error> {
+    let mut csm = common::Csm::new()?;
+    csm_env_create(&mut csm, "test_csm_env_pack")?;
+
+    let args = [
+        "env",
+        "pack",
+        "-n",
+        "test_csm_env_pack",
+        "-o",
+        "packed.tar.gz",
+    ];
+
+    // If conda-pack isn't installed, we give a useful error
+    csm.command()
+        .args(args)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "conda-pack was not found in the environment.",
+        ));
+
+    csm.command()
+        .args([
+            "env",
+            "run",
+            "-n",
+            "test_csm_env_pack",
+            "pip",
+            "install",
+            "conda-pack==0.8.1",
+        ])
+        .assert()
+        .success();
+
+    csm.command()
+        .args([
+            "env",
+            "pack",
+            "-n",
+            "test_csm_env_pack",
+            "-o",
+            "packed.tar.gz",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("100% Completed"));
+
+    // TODO: unpack
+
     Ok(())
 }
