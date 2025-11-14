@@ -18,10 +18,10 @@ pub enum Subcommand {
     Deactivate,
     /// Run an executable in an environment
     Run(RunArgs),
-    /// ???
-    Pack,
-    /// ???
-    Unpack,
+    /// Create an archive from an environment. Requires `conda-pack` to be in the environment.
+    Pack(PackArgs),
+    /// Unpack an archive to create an environment from it.
+    Unpack(CommonEnvArgs),
     /// List existing environments
     List,
     /// Display information about the micromamba setup
@@ -42,14 +42,26 @@ pub struct RunArgs {
     /// If specified, the name of the environment. If not specified, csm will
     /// look to robotmk-env.yaml for a "name" field to use instead. As a last
     /// resort, the current directory name will be used
-    #[arg(short, long, value_name = "ENV_NAME")]
-    name: Option<String>,
+    #[command(flatten)]
+    common: CommonEnvArgs,
     /// The command to run
     #[arg(value_name = "COMMAND")]
     command: String,
     /// Arguments to pass to the command
     #[arg(value_name = "ARGS")]
     arguments: Vec<String>,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct PackArgs {
+    /// Common environment arguments
+    #[command(flatten)]
+    common: CommonEnvArgs,
+    /// Output path/filename of the packed environment. If not specified, the
+    /// same method is used to determine the environment name as for the
+    /// "--name" parameter, and the default name is <env_name>.tar.gz
+    #[arg(long, short, value_name = "OUTPUT")]
+    output: Option<String>,
 }
 
 /// Contains the fields we need from a parsed `robotmk-env.yml` file.
@@ -153,7 +165,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::List => micromamba(&config, vec!["env", "list"], true).into(),
         Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
         Subcommand::Run(args) => {
-            let env_name = env_name(args.name)?;
+            let env_name = env_name(args.common.name)?;
             let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
             micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
             micromamba(&config, micromamba_args, true).into()
@@ -205,6 +217,49 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
             println!("{}", shell.restore_and_unset_env_var("CONDA_PREFIX"));
             println!("{}", shell.restore_and_unset_env_var("CONDA_SHLVL"));
             Ok(())
+        }
+        Subcommand::Pack(args) => {
+            let env_name = env_name(args.common.name)?;
+            let Some(bin_path) = micromamba::bin_path_for_env(&config, &env_name) else {
+                error!(
+                    "Could not determine binary path for environment '{}'",
+                    &env_name
+                );
+                return Err(ExitCode::FAILURE);
+            };
+            let binary_name = if cfg!(windows) {
+                "conda-pack.exe"
+            } else {
+                "conda-pack"
+            };
+            let conda_pack = bin_path.join(binary_name);
+            if !conda_pack.exists() {
+                debug!("Path does not exist: {:?}", conda_pack);
+                error!(
+                    "conda-pack was not found in the environment. It must be installed to use this command."
+                );
+                return Err(ExitCode::FAILURE);
+            }
+            let Some(env_path) = micromamba::path_for_env(&config, &env_name) else {
+                error!("Could not determine path for environment '{}'", env_name);
+                return Err(ExitCode::FAILURE);
+            };
+            let output = args.output.unwrap_or(format!("{}.tar.gz", env_name));
+            micromamba(
+                &config,
+                vec![
+                    "run",
+                    "--name",
+                    &env_name,
+                    &binary_name,
+                    "--prefix",
+                    &env_path.to_string_lossy(),
+                    "--output",
+                    &output,
+                ],
+                true,
+            )
+            .into()
         }
         _ => {
             println!("{:?}", config);
