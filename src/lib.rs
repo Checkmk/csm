@@ -18,6 +18,15 @@ impl CSMResult for ExitCode {
     }
 }
 
+impl<T> CSMResult for Result<T, ExitCode> {
+    fn finish(&self) -> ExitCode {
+        match self {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(code) => *code,
+        }
+    }
+}
+
 impl<T> CSMResult for Result<T, std::io::Error> {
     fn finish(&self) -> ExitCode {
         match self {
