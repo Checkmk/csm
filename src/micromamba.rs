@@ -50,6 +50,15 @@ impl MicromambaResult {
     }
 }
 
+impl From<MicromambaResult> for Result<(), ExitCode> {
+    fn from(result: MicromambaResult) -> Self {
+        match result.exit_code() {
+            ExitCode::SUCCESS => Ok(()),
+            e => Err(e),
+        }
+    }
+}
+
 enum DownloadError {
     IncompatibleOS,
     BinNotInArchive,

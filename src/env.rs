@@ -105,13 +105,20 @@ pub fn determine_env_name(explicit_name: Option<String>) -> Option<String> {
     }
 }
 
-pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
+fn env_name(explicit_name: Option<String>) -> Result<String, ExitCode> {
+    match determine_env_name(explicit_name) {
+        Some(name) => Ok(name),
+        None => {
+            error!("No environment name could be determined. You can specify one with --name");
+            Err(ExitCode::FAILURE)
+        }
+    }
+}
+
+pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
     match subcommand {
         Subcommand::Create(args) => {
-            let Some(env_name) = determine_env_name(args.name) else {
-                error!("No environment name could be determined. You can specify one with --name");
-                return ExitCode::FAILURE;
-            };
+            let env_name = env_name(args.name)?;
             info!(
                 "Creating environment '{}' - this may take some time...",
                 env_name
@@ -131,7 +138,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             );
             let rc = result.exit_code();
             match result {
-                MicromambaResult::CapturedOutput(output) if rc != ExitCode::SUCCESS => {
+                MicromambaResult::CapturedOutput(ref output) if rc != ExitCode::SUCCESS => {
                     error!("Got a non-zero exit code from micromamba, dumping output:");
                     error!("micromamba stdout:");
                     println!("{}", String::from_utf8_lossy(&output.stdout));
@@ -141,31 +148,23 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                 MicromambaResult::CapturedOutput(_) if rc == ExitCode::SUCCESS => info!("Done."),
                 _ => {}
             }
-            rc
+            result.into()
         }
-        Subcommand::List => micromamba(&config, vec!["env", "list"], true).exit_code(),
-        Subcommand::Info => micromamba(&config, vec!["info"], true).exit_code(),
+        Subcommand::List => micromamba(&config, vec!["env", "list"], true).into(),
+        Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
         Subcommand::Run(args) => {
-            let Some(env_name) = determine_env_name(args.name) else {
-                error!("No environment name could be determined. You can specify one with --name");
-                return ExitCode::FAILURE;
-            };
+            let env_name = env_name(args.name)?;
             let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
             micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
-            micromamba(&config, micromamba_args, true).exit_code()
+            micromamba(&config, micromamba_args, true).into()
         }
         Subcommand::Activate(args) => {
             let Some(shell) = SupportedShell::from_csm_hook() else {
                 error!("Your shell does not appear to have the csm hook enabled");
                 error!("See 'csm init' for information on how to set up the hook");
-                return ExitCode::FAILURE;
+                return Err(ExitCode::FAILURE);
             };
-
-            let Some(env_name) = determine_env_name(args.name) else {
-                error!("No environment name could be determined. You can specify one with --name");
-                return ExitCode::FAILURE;
-            };
-
+            let env_name = env_name(args.name)?;
             info!("Activating environment '{}'...", env_name);
 
             // NOTE: Anything to stdout here is *evaluated by the user's shell*
@@ -177,14 +176,14 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
                     "Could not determine binary path for environment '{}'",
                     env_name
                 );
-                return ExitCode::FAILURE;
+                return Err(ExitCode::FAILURE);
             };
             println!("{}", shell.prepend_path(&bin_path));
 
             // And a few conda-specific vars
             let Some(env_path) = micromamba::path_for_env(&config, &env_name) else {
                 error!("Could not determine path for environment '{}'", env_name);
-                return ExitCode::FAILURE;
+                return Err(ExitCode::FAILURE);
             };
             println!("{}", shell.set_env_var("CONDA_DEFAULT_ENV", &env_name));
             println!(
@@ -193,24 +192,24 @@ pub fn run(config: Config, subcommand: Subcommand) -> ExitCode {
             );
             println!("{}", shell.set_env_var("CONDA_SHLVL", "1"));
 
-            ExitCode::SUCCESS
+            Ok(())
         }
         Subcommand::Deactivate => {
             let Some(shell) = SupportedShell::from_csm_hook() else {
                 error!("Your shell does not appear to have the csm hook enabled");
                 error!("See 'csm init' for information on how to set up the hook");
-                return ExitCode::FAILURE;
+                return Err(ExitCode::FAILURE);
             };
             println!("{}", shell.restore_and_unset_env_var("PATH"));
             println!("{}", shell.restore_and_unset_env_var("CONDA_DEFAULT_ENV"));
             println!("{}", shell.restore_and_unset_env_var("CONDA_PREFIX"));
             println!("{}", shell.restore_and_unset_env_var("CONDA_SHLVL"));
-            ExitCode::SUCCESS
+            Ok(())
         }
         _ => {
             println!("{:?}", config);
             println!("{:?}", subcommand);
-            ExitCode::SUCCESS
+            Ok(())
         }
     }
 }
