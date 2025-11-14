@@ -6,7 +6,6 @@ pub mod robot;
 pub mod shell;
 
 use log::error;
-use std::fmt;
 use std::process::ExitCode;
 
 pub trait CSMResult {
@@ -19,7 +18,7 @@ impl CSMResult for ExitCode {
     }
 }
 
-impl<T, E: fmt::Display> CSMResult for Result<T, E> {
+impl<T> CSMResult for Result<T, std::io::Error> {
     fn finish(&self) -> ExitCode {
         match self {
             Ok(_) => ExitCode::SUCCESS,
