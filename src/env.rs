@@ -5,7 +5,7 @@ use crate::shell::SupportedShell;
 use log::{debug, error, info};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
-use std::path::Component;
+use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
 #[derive(Debug, clap::Subcommand)]
@@ -35,13 +35,19 @@ pub struct CommonEnvArgs {
     /// resort, the current directory name will be used
     #[arg(short, long, value_name = "ENV_NAME")]
     name: Option<String>,
+
+    /// If specified, overrides the env file passed to micromamba and used as
+    /// a fallback for determining the environment name.
+    #[arg(
+        long = "env-file",
+        value_name = "PATH",
+        default_value = "robotmk-env.yaml"
+    )]
+    env_file: PathBuf,
 }
 
 #[derive(Debug, clap::Args)]
 pub struct RunArgs {
-    /// If specified, the name of the environment. If not specified, csm will
-    /// look to robotmk-env.yaml for a "name" field to use instead. As a last
-    /// resort, the current directory name will be used
     #[command(flatten)]
     common: CommonEnvArgs,
     /// The command to run
@@ -71,14 +77,13 @@ struct RobotmkEnv {
     name: Option<String>,
 }
 
-/// Attempt to parse a robotmk-env.yaml in the current directory.
-fn parse_robotmk_env_yaml() -> Result<RobotmkEnv, std::io::Error> {
-    // TODO: Should we handle .yml too?
-    let contents = std::fs::read_to_string("robotmk-env.yaml")?;
+/// Attempt to parse an environment file.
+fn parse_env_yaml(path: &Path) -> Result<RobotmkEnv, std::io::Error> {
+    let contents = std::fs::read_to_string(path)?;
     serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
 }
 
-pub fn determine_env_name(explicit_name: Option<String>) -> Option<String> {
+pub fn determine_env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Option<String> {
     // If someone gave an explicit --name, use that first.
     if let Some(name) = explicit_name {
         debug!("Using '{}' as env name, given by CLI argument", name);
@@ -86,9 +91,9 @@ pub fn determine_env_name(explicit_name: Option<String>) -> Option<String> {
     }
 
     // Fallback 1: Look for a name key in robotmk-env.yaml
-    // We ignore errors from parse_robotmk_env_yaml() here, we'll fall back
+    // We ignore errors from parse_env_yaml() here, we'll fall back
     // below if we can't parse it for some reason
-    if let Ok(env) = parse_robotmk_env_yaml()
+    if let Ok(env) = parse_env_yaml(env_yaml_path)
         && let Some(name) = env.name
     {
         debug!("Using '{}' as env name, found in robotmk-env.yaml", name);
@@ -117,8 +122,8 @@ pub fn determine_env_name(explicit_name: Option<String>) -> Option<String> {
     }
 }
 
-fn env_name(explicit_name: Option<String>) -> Result<String, ExitCode> {
-    match determine_env_name(explicit_name) {
+fn env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Result<String, ExitCode> {
+    match determine_env_name(explicit_name, env_yaml_path) {
         Some(name) => Ok(name),
         None => {
             error!("No environment name could be determined. You can specify one with --name");
@@ -130,7 +135,7 @@ fn env_name(explicit_name: Option<String>) -> Result<String, ExitCode> {
 pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
     match subcommand {
         Subcommand::Create(args) => {
-            let env_name = env_name(args.name)?;
+            let env_name = env_name(args.name, &args.env_file)?;
             info!(
                 "Creating environment '{}' - this may take some time...",
                 env_name
@@ -141,7 +146,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
                     "env",
                     "create",
                     "--file",
-                    "robotmk-env.yaml",
+                    &args.env_file.to_string_lossy(),
                     "--name",
                     &env_name,
                     "--yes",
@@ -165,7 +170,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::List => micromamba(&config, vec!["env", "list"], true).into(),
         Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
         Subcommand::Run(args) => {
-            let env_name = env_name(args.common.name)?;
+            let env_name = env_name(args.common.name, &args.common.env_file)?;
             let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
             micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
             micromamba(&config, micromamba_args, true).into()
@@ -176,7 +181,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
                 error!("See 'csm init' for information on how to set up the hook");
                 return Err(ExitCode::FAILURE);
             };
-            let env_name = env_name(args.name)?;
+            let env_name = env_name(args.name, &args.env_file)?;
             info!("Activating environment '{}'...", env_name);
 
             // NOTE: Anything to stdout here is *evaluated by the user's shell*
@@ -219,7 +224,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
             Ok(())
         }
         Subcommand::Pack(args) => {
-            let env_name = env_name(args.common.name)?;
+            let env_name = env_name(args.common.name, &args.common.env_file)?;
             let Some(bin_path) = micromamba::bin_path_for_env(&config, &env_name) else {
                 error!(
                     "Could not determine binary path for environment '{}'",
