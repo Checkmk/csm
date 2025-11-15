@@ -19,7 +19,13 @@ fn csm_env_create(csm: &mut common::Csm, name: &str) -> Result<(), Error> {
 #[test]
 fn test_csm_env_create() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
-    csm_env_create(&mut csm, "test_csm_env_create")
+    csm_env_create(&mut csm, "test_csm_env_create")?;
+
+    // Ensure the post build command ran, it should create a file called
+    // post_build in the home directory.
+    let file_path = csm.home_dir.path().join("post_build");
+    assert!(file_path.exists());
+    Ok(())
 }
 
 /// Create an environment and then test that it shows in `csm env list`
@@ -112,7 +118,7 @@ fn test_csm_env_create_env_name() -> Result<(), Error> {
         .stderr(predicate::str::contains(
             "Using 'micromamba-minimal' as env name",
         ))
-        .stderr(predicate::str::contains("found in robotmk-env.yaml"));
+        .stderr(predicate::str::contains("found in \"robotmk-env.yaml\""));
 
     // robotmk-env.yaml exists, but name overridden with --name
     csm.command()
@@ -279,6 +285,43 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
         .stdout(predicate::str::contains("100% Completed"));
 
     // TODO: unpack
+
+    Ok(())
+}
+
+/// Test handling of robotmk-setup.yaml and alternatives.
+#[test]
+fn csm_env_create_with_setup() -> Result<(), Error> {
+    let csm = common::Csm::new()?;
+    csm.command()
+        .args(["-n", "env", "create", "--setup-file", "doesnotexist"])
+        .env_clear()
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Explicit --setup-file"))
+        .stderr(predicate::str::contains("does not exist"));
+
+    std::fs::File::create(csm.home_dir.path().join("testsetup.yaml"))?;
+
+    csm.command()
+        .args(["-nv", "env", "create", "--setup-file", "testsetup.yaml"])
+        .env_clear()
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Read setup file 'testsetup.yaml'"));
+
+    csm.command()
+        .args([
+            "-nv",
+            "env",
+            "create",
+            "--setup-file",
+            &csm.home_dir.path().to_string_lossy(),
+        ])
+        .env_clear()
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("but could not read it"));
 
     Ok(())
 }
