@@ -2,7 +2,7 @@ use crate::csmrc::Config;
 use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
 use std::path::{Component, Path, PathBuf};
@@ -11,7 +11,7 @@ use std::process::ExitCode;
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
     /// Create an environment
-    Create(CommonEnvArgs),
+    Create(CreateArgs),
     /// Activate an environment
     Activate(CommonEnvArgs),
     /// Deactivate an environment
@@ -47,6 +47,16 @@ pub struct CommonEnvArgs {
 }
 
 #[derive(Debug, clap::Args)]
+pub struct CreateArgs {
+    #[command(flatten)]
+    common: CommonEnvArgs,
+
+    /// If specified, overrides the post-creation setup file [default: robotmk-setup.yaml]
+    #[arg(long = "setup-file", value_name = "PATH")]
+    setup_file: Option<PathBuf>,
+}
+
+#[derive(Debug, clap::Args)]
 pub struct RunArgs {
     #[command(flatten)]
     common: CommonEnvArgs,
@@ -70,15 +80,56 @@ pub struct PackArgs {
     output: Option<String>,
 }
 
-/// Contains the fields we need from a parsed `robotmk-env.yml` file.
+/// Contains the fields we need from a parsed environment file.
 #[derive(Deserialize)]
 struct RobotmkEnv {
     /// The name of the environment
     name: Option<String>,
 }
 
+/// Contains the fields we need from a parsed setup file.
+#[derive(Deserialize)]
+struct RobotmkSetup {
+    /// Commands to run in the environment after it has been created
+    post_build_commands: Option<Vec<PostBuildCommand>>,
+}
+
+#[derive(Deserialize)]
+struct PostBuildCommand {
+    name: Option<String>,
+    command: Vec<String>,
+}
+
+impl RobotmkSetup {
+    /// Attempt to parse a setup file.
+    fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        let contents = std::fs::read_to_string(path)?;
+        serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    }
+
+    fn run_post_create(self, config: &Config, env_name: &str) -> Result<(), ExitCode> {
+        for command in self.post_build_commands.unwrap_or_default() {
+            info!(
+                "Start post-create: {}",
+                command.name.unwrap_or(format!("{:?}", command.command))
+            );
+            let mut args = vec!["run", "--name", &env_name];
+            args.extend(command.command.iter().map(|s| s.as_str()));
+            let result = micromamba(config, args, config.verbose);
+            let rc = result.exit_code();
+            dump_micromamba_captured_output_on_error(&result, rc);
+            if rc != ExitCode::SUCCESS {
+                error!("The command returned exited with an error code");
+                error!("Not executing further post-create commands");
+                return Err(rc);
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Attempt to parse an environment file.
-fn parse_env_yaml(path: &Path) -> Result<RobotmkEnv, std::io::Error> {
+fn parse_env_yaml<P: AsRef<Path>>(path: P) -> Result<RobotmkEnv, std::io::Error> {
     let contents = std::fs::read_to_string(path)?;
     serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
 }
@@ -96,7 +147,7 @@ pub fn determine_env_name(explicit_name: Option<String>, env_yaml_path: &Path) -
     if let Ok(env) = parse_env_yaml(env_yaml_path)
         && let Some(name) = env.name
     {
-        debug!("Using '{}' as env name, found in robotmk-env.yaml", name);
+        debug!("Using '{}' as env name, found in {:?}", name, env_yaml_path);
         return Some(name);
     }
 
@@ -132,10 +183,31 @@ fn env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Result<Strin
     }
 }
 
+fn dump_micromamba_captured_output_on_error(result: &MicromambaResult, rc: ExitCode) {
+    match result {
+        MicromambaResult::CapturedOutput(output) if rc != ExitCode::SUCCESS => {
+            error!("Got a non-zero exit code from micromamba, dumping output:");
+            error!("micromamba stdout:");
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+            error!("micromamba stderr:");
+            println!("{}", String::from_utf8_lossy(&output.stderr));
+        }
+        MicromambaResult::CapturedOutput(_) if rc == ExitCode::SUCCESS => info!("Done."),
+        _ => {}
+    }
+}
+
 pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
     match subcommand {
         Subcommand::Create(args) => {
-            let env_name = env_name(args.name, &args.env_file)?;
+            if let Some(path) = &args.setup_file
+                && !path.exists()
+            {
+                error!("Explicit --setup-file was given, but the path does not exist.");
+                return Err(ExitCode::FAILURE);
+            }
+
+            let env_name = env_name(args.common.name, &args.common.env_file)?;
             info!(
                 "Creating environment '{}' - this may take some time...",
                 env_name
@@ -146,7 +218,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
                     "env",
                     "create",
                     "--file",
-                    &args.env_file.to_string_lossy(),
+                    &args.common.env_file.to_string_lossy(),
                     "--name",
                     &env_name,
                     "--yes",
@@ -154,16 +226,43 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
                 config.verbose,
             );
             let rc = result.exit_code();
-            match result {
-                MicromambaResult::CapturedOutput(ref output) if rc != ExitCode::SUCCESS => {
-                    error!("Got a non-zero exit code from micromamba, dumping output:");
-                    error!("micromamba stdout:");
-                    println!("{}", String::from_utf8_lossy(&output.stdout));
-                    error!("micromamba stderr:");
-                    println!("{}", String::from_utf8_lossy(&output.stderr));
+            dump_micromamba_captured_output_on_error(&result, rc);
+            if rc == ExitCode::SUCCESS {
+                let (filename, required) = match args.setup_file {
+                    None => ("robotmk-setup.yaml".into(), false),
+                    Some(path) => (path, true),
+                };
+                let setup = match RobotmkSetup::from_path(&filename) {
+                    Err(e) if e.kind() == ErrorKind::NotFound => {
+                        if required {
+                            // Handled above, but theoretical race here, so handle it
+                            error!("The specified setup file was not found");
+                            None
+                        } else {
+                            debug!(
+                                "No explicit setup file path given, and the default \
+                                 robotmk-setup.yaml was not found, continuing."
+                            );
+                            None
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Found setup file '{}', but could not read it: {}",
+                            filename.display(),
+                            e
+                        );
+                        None
+                    }
+                    Ok(setup) => {
+                        debug!("Read setup file '{}'", filename.display());
+                        Some(setup)
+                    }
+                };
+                match setup {
+                    Some(setup) => setup.run_post_create(&config, &env_name)?,
+                    None => debug!("No usable setup file, skipping post_create"),
                 }
-                MicromambaResult::CapturedOutput(_) if rc == ExitCode::SUCCESS => info!("Done."),
-                _ => {}
             }
             result.into()
         }

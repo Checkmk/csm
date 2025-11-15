@@ -1,8 +1,9 @@
-# This file contains commands to be executed by the Robotmk Scheduler 
-# AFTER the environment has been created. 
+# This file contains commands to be executed by the Robotmk Scheduler
+# AFTER the environment has been created.
 #
-#post_build_commands:
-#  - name: rfbrowser_init
-#    command:
-#      - rfbrowser
-#      - init
+post_build_commands:
+  - name: write a file
+    command:
+      - python3
+      - "-c"
+      - import os; open(os.path.expanduser('~/post_build'), 'w').write('hey')
