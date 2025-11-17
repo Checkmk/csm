@@ -1,0 +1,51 @@
+---
+name: Reusable CI workflow
+
+on:
+  workflow_call:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+          rustflags: ""
+          target: x86_64-unknown-linux-gnu
+      - uses: mamba-org/setup-micromamba@v2
+        env:
+          ACTIONS_STEP_DEBUG: true
+      - run: sudo apt-get update && sudo apt-get install -y fish zsh
+      - run: cargo test --all-features
+        if: always()
+      - run: cargo fmt --check
+        if: always()
+      - run: cargo clippy --all-targets
+        if: always()
+      - run: cargo build --release --all-features
+        if: always()
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+          rustflags: ""
+          target: x86_64-pc-windows-msvc
+      - uses: mamba-org/setup-micromamba@v2
+        env:
+          ACTIONS_STEP_DEBUG: true
+      - run: cargo test --no-default-features --features=__test_powershell
+        if: always()
+      - run: cargo fmt --check
+        if: always()
+      - run: cargo clippy --all-targets
+        if: always()
+      - run: cargo build --release --features=__test_powershell
+        if: always()
