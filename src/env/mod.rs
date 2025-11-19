@@ -121,12 +121,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::Create(args) => create::run(config, args),
         Subcommand::List => micromamba(&config, vec!["env", "list"], true).into(),
         Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
-        Subcommand::Run(args) => {
-            let env_name = env_name(args.common.name, &args.common.env_file)?;
-            let mut micromamba_args = vec!["run", "--name", &env_name, &args.command];
-            micromamba_args.extend(args.arguments.iter().map(|s| s.as_str()));
-            micromamba(&config, micromamba_args, true).into()
-        }
+        Subcommand::Run(args) => run::run(config, args),
         Subcommand::Activate(args) => {
             let Some(shell) = SupportedShell::from_csm_hook() else {
                 error!("Your shell does not appear to have the csm hook enabled");
