@@ -353,3 +353,27 @@ pub fn bin_path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
     let os_specific_bin = if cfg!(windows) { "Scripts" } else { "bin" };
     path_for_env(config, name).map(|p| p.join(os_specific_bin))
 }
+
+/// Create a directory for a new environment, if it does not already exist.
+pub fn create_env_dir(config: &Config, name: &str) -> Result<PathBuf, std::io::Error> {
+    let env_path = match path_for_env(config, name) {
+        Some(path) => path,
+        None => {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Could not determine path for environment '{}'", name),
+            ));
+        }
+    };
+    if env_path.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "The target environment directory '{:?}' already exists",
+                env_path
+            ),
+        ));
+    }
+    std::fs::create_dir_all(&env_path)?;
+    Ok(env_path)
+}

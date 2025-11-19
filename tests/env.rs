@@ -284,7 +284,43 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
         .success()
         .stdout(predicate::str::contains("100% Completed"));
 
-    // TODO: unpack
+    csm.command()
+        .args(["env", "unpack", "-n", "unpacked", "packed.tar.gz"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Successfully unpacked environment",
+        ));
+
+    let (shell, cmd) = if cfg!(windows) {
+        ("powershell", "echo $env:CONDA_PROMPT_MODIFIER")
+    } else {
+        ("sh", "echo $CONDA_PROMPT_MODIFIER")
+    };
+
+    csm.command()
+        .args(["env", "run", "-n", "unpacked", "--", shell, "-c", cmd])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(unpacked)"));
+
+    Ok(())
+}
+
+/// Test `csm env unpack` environment name detection
+#[test]
+fn test_csm_env_unpack_detect_name() -> Result<(), Error> {
+    let csm = common::Csm::new()?;
+
+    for path in ["/path/to/my_env.tar.gz", "my_env.tgz"] {
+        csm.command()
+            .args(["-n", "env", "unpack", path])
+            .assert()
+            .failure() // with -n, it won't be able to resolve paths, so it'll fail
+            .stderr(predicate::str::contains(
+                "Using 'my_env' as environment name",
+            ));
+    }
 
     Ok(())
 }
