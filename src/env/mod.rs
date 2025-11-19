@@ -7,13 +7,11 @@ pub mod unpack;
 
 use crate::csmrc::Config;
 use crate::env::parsing::env_file::RobotmkEnv;
-use crate::env::parsing::setup_file::RobotmkSetup;
 use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::fs;
-use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
@@ -94,7 +92,7 @@ pub fn determine_env_name(explicit_name: Option<String>, env_yaml_path: &Path) -
     }
 }
 
-fn env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Result<String, ExitCode> {
+pub fn env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Result<String, ExitCode> {
     match determine_env_name(explicit_name, env_yaml_path) {
         Some(name) => Ok(name),
         None => {
@@ -120,73 +118,7 @@ fn dump_micromamba_captured_output_on_error(result: &MicromambaResult, rc: ExitC
 
 pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
     match subcommand {
-        Subcommand::Create(args) => {
-            if let Some(path) = &args.setup_file
-                && !path.exists()
-            {
-                error!("Explicit --setup-file was given, but the path does not exist.");
-                return Err(ExitCode::FAILURE);
-            }
-
-            let env_name = env_name(args.common.name, &args.common.env_file)?;
-            info!(
-                "Creating environment '{}' - this may take some time...",
-                env_name
-            );
-            let result = micromamba(
-                &config,
-                vec![
-                    "env",
-                    "create",
-                    "--file",
-                    &args.common.env_file.to_string_lossy(),
-                    "--name",
-                    &env_name,
-                    "--yes",
-                ],
-                config.verbose,
-            );
-            let rc = result.exit_code();
-            dump_micromamba_captured_output_on_error(&result, rc);
-            if rc == ExitCode::SUCCESS {
-                let (filename, required) = match args.setup_file {
-                    None => ("robotmk-setup.yaml".into(), false),
-                    Some(path) => (path, true),
-                };
-                let setup = match RobotmkSetup::from_path(&filename) {
-                    Err(e) if e.kind() == ErrorKind::NotFound => {
-                        if required {
-                            // Handled above, but theoretical race here, so handle it
-                            error!("The specified setup file was not found");
-                            None
-                        } else {
-                            debug!(
-                                "No explicit setup file path given, and the default \
-                                 robotmk-setup.yaml was not found, continuing."
-                            );
-                            None
-                        }
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Found setup file '{}', but could not read it: {}",
-                            filename.display(),
-                            e
-                        );
-                        None
-                    }
-                    Ok(setup) => {
-                        debug!("Read setup file '{}'", filename.display());
-                        Some(setup)
-                    }
-                };
-                match setup {
-                    Some(setup) => setup.run_post_create(&config, &env_name)?,
-                    None => debug!("No usable setup file, skipping post_create"),
-                }
-            }
-            result.into()
-        }
+        Subcommand::Create(args) => create::run(config, args),
         Subcommand::List => micromamba(&config, vec!["env", "list"], true).into(),
         Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
         Subcommand::Run(args) => {
