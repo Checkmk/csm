@@ -38,7 +38,7 @@ pub enum Subcommand {
 }
 
 #[derive(Debug, clap::Args)]
-pub struct CommonEnvArgs {
+pub struct CommonArgs {
     /// If specified, the name of the environment. If not specified, csm will
     /// look to robotmk-env.yaml for a "name" field to use instead. As a last
     /// resort, the current directory name will be used

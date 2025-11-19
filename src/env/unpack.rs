@@ -1,4 +1,4 @@
-use crate::env::CommonEnvArgs;
+use crate::env::CommonArgs;
 
 use std::path::PathBuf;
 
@@ -6,7 +6,7 @@ use std::path::PathBuf;
 pub struct Args {
     /// Common environment arguments
     #[command(flatten)]
-    pub common: CommonEnvArgs,
+    pub common: CommonArgs,
     /// Path to a packed environment archive (ending in .tar.gz)
     #[arg(value_name = "ARCHIVE")]
     pub archive_path: PathBuf,
