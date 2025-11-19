@@ -17,14 +17,15 @@ pub struct Args {
     pub archive_path: PathBuf,
 }
 
+fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
+    let filename = archive_path.file_name()?.to_str()?;
+    filename
+        .strip_suffix(".tar.gz")
+        .or_else(|| filename.strip_suffix(".tgz"))
+        .map(String::from)
+}
+
 pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
-    fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
-        let filename = archive_path.file_name()?.to_str()?;
-        filename
-            .strip_suffix(".tar.gz")
-            .or_else(|| filename.strip_suffix(".tgz"))
-            .map(String::from)
-    }
     let env_name = match args.common.name {
         Some(name) => name,
         None => match archive_name_to_env_name(&args.archive_path) {
