@@ -1,4 +1,5 @@
 pub mod create;
+pub mod pack;
 pub mod run;
 
 use crate::csmrc::Config;
@@ -23,7 +24,7 @@ pub enum Subcommand {
     /// Run an executable in an environment
     Run(run::Args),
     /// Create an archive from an environment. Requires `conda-pack` to be in the environment.
-    Pack(PackArgs),
+    Pack(pack::Args),
     /// Unpack an archive to create an environment from it.
     Unpack(UnpackArgs),
     /// List existing environments
@@ -48,18 +49,6 @@ pub struct CommonEnvArgs {
         default_value = "robotmk-env.yaml"
     )]
     env_file: PathBuf,
-}
-
-#[derive(Debug, clap::Args)]
-pub struct PackArgs {
-    /// Common environment arguments
-    #[command(flatten)]
-    common: CommonEnvArgs,
-    /// Output path/filename of the packed environment, ending in .tar.gz. If
-    /// not specified, the same method is used to determine the environment name
-    /// as for the "--name" parameter, and the default name is <env_name>.tar.gz
-    #[arg(long, short, value_name = "OUTPUT")]
-    output: Option<String>,
 }
 
 #[derive(Debug, clap::Args)]
