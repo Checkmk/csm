@@ -4,6 +4,7 @@ use crate::shell::SupportedShell;
 
 use log::{debug, error, info, warn};
 use serde::Deserialize;
+use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
@@ -21,7 +22,7 @@ pub enum Subcommand {
     /// Create an archive from an environment. Requires `conda-pack` to be in the environment.
     Pack(PackArgs),
     /// Unpack an archive to create an environment from it.
-    Unpack(CommonEnvArgs),
+    Unpack(UnpackArgs),
     /// List existing environments
     List,
     /// Display information about the micromamba setup
@@ -73,11 +74,21 @@ pub struct PackArgs {
     /// Common environment arguments
     #[command(flatten)]
     common: CommonEnvArgs,
-    /// Output path/filename of the packed environment. If not specified, the
-    /// same method is used to determine the environment name as for the
-    /// "--name" parameter, and the default name is <env_name>.tar.gz
+    /// Output path/filename of the packed environment, ending in .tar.gz. If
+    /// not specified, the same method is used to determine the environment name
+    /// as for the "--name" parameter, and the default name is <env_name>.tar.gz
     #[arg(long, short, value_name = "OUTPUT")]
     output: Option<String>,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct UnpackArgs {
+    /// Common environment arguments
+    #[command(flatten)]
+    common: CommonEnvArgs,
+    /// Path to a packed environment archive (ending in .tar.gz)
+    #[arg(value_name = "ARCHIVE")]
+    archive_path: PathBuf,
 }
 
 /// Contains the fields we need from a parsed environment file.
@@ -365,10 +376,74 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
             )
             .into()
         }
-        _ => {
-            println!("{:?}", config);
-            println!("{:?}", subcommand);
-            Ok(())
+        Subcommand::Unpack(args) => {
+            fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
+                let filename = archive_path.file_name()?.to_str()?;
+                filename
+                    .strip_suffix(".tar.gz")
+                    .or_else(|| filename.strip_suffix(".tgz"))
+                    .map(String::from)
+            }
+            let env_name = match args.common.name {
+                Some(name) => name,
+                None => match archive_name_to_env_name(&args.archive_path) {
+                    Some(name) => {
+                        info!(
+                            "Using '{}' as environment name, based on archive filename",
+                            name
+                        );
+                        name
+                    }
+                    None => {
+                        error!(
+                            "Could not determine environment name from archive filename. Please specify an environment name with --name."
+                        );
+                        return Err(ExitCode::FAILURE);
+                    }
+                },
+            };
+
+            // TODO: We really need a more generic error type to avoid this kind of mapping everywhere
+            let target_env_path = micromamba::create_env_dir(&config, &env_name).map_err(|e| {
+                error!("{}", e);
+                ExitCode::FAILURE
+            })?;
+
+            // Send the archive to flate2 to decompress and untar
+            info!(
+                "Unpacking archive '{}' to create environment '{}'",
+                args.archive_path.display(),
+                env_name
+            );
+            debug!("Opening '{}' for read", args.archive_path.display());
+            let archive_file = fs::File::open(&args.archive_path).map_err(|e| {
+                error!("{}", e);
+                ExitCode::FAILURE
+            })?;
+            let decompressor = flate2::read::GzDecoder::new(archive_file);
+            let mut archive = tar::Archive::new(decompressor);
+            archive.unpack(&target_env_path).map_err(|e| {
+                error!(
+                    "Could not unpack archive to '{}': {}",
+                    target_env_path.display(),
+                    e
+                );
+                ExitCode::FAILURE
+            })?;
+            info!(
+                "Successfully unpacked environment to '{}'",
+                target_env_path.display()
+            );
+
+            info!("Running 'conda-unpack' in the new environment to fix paths...");
+            let result = micromamba(
+                &config,
+                vec!["run", "--name", &env_name, "conda-unpack"],
+                config.verbose,
+            );
+            let rc = result.exit_code();
+            dump_micromamba_captured_output_on_error(&result, rc);
+            result.into()
         }
     }
 }
