@@ -1,3 +1,4 @@
+pub mod activate;
 pub mod create;
 pub mod pack;
 pub mod run;
@@ -19,7 +20,7 @@ pub enum Subcommand {
     /// Create an environment
     Create(create::Args),
     /// Activate an environment
-    Activate(CommonEnvArgs),
+    Activate(activate::Args),
     /// Deactivate an environment
     Deactivate,
     /// Run an executable in an environment
@@ -252,7 +253,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
                 error!("See 'csm init' for information on how to set up the hook");
                 return Err(ExitCode::FAILURE);
             };
-            let env_name = env_name(args.name, &args.env_file)?;
+            let env_name = env_name(args.common.name, &args.common.env_file)?;
             info!("Activating environment '{}'...", env_name);
 
             // NOTE: Anything to stdout here is *evaluated by the user's shell*
