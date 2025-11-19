@@ -7,13 +7,13 @@ pub mod unpack;
 
 use crate::csmrc::Config;
 use crate::env::parsing::env_file::RobotmkEnv;
+use crate::env::parsing::setup_file::RobotmkSetup;
 use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
 use log::{debug, error, info, warn};
-use serde::Deserialize;
 use std::fs;
-use std::io::{Error, ErrorKind};
+use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
@@ -53,47 +53,6 @@ pub struct CommonArgs {
         default_value = "robotmk-env.yaml"
     )]
     env_file: PathBuf,
-}
-
-/// Contains the fields we need from a parsed setup file.
-#[derive(Deserialize)]
-struct RobotmkSetup {
-    /// Commands to run in the environment after it has been created
-    post_build_commands: Option<Vec<PostBuildCommand>>,
-}
-
-#[derive(Deserialize)]
-struct PostBuildCommand {
-    name: Option<String>,
-    command: Vec<String>,
-}
-
-impl RobotmkSetup {
-    /// Attempt to parse a setup file.
-    fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        let contents = std::fs::read_to_string(path)?;
-        serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
-    }
-
-    fn run_post_create(self, config: &Config, env_name: &str) -> Result<(), ExitCode> {
-        for command in self.post_build_commands.unwrap_or_default() {
-            info!(
-                "Start post-create: {}",
-                command.name.unwrap_or(format!("{:?}", command.command))
-            );
-            let mut args = vec!["run", "--name", &env_name];
-            args.extend(command.command.iter().map(|s| s.as_str()));
-            let result = micromamba(config, args, config.verbose);
-            let rc = result.exit_code();
-            dump_micromamba_captured_output_on_error(&result, rc);
-            if rc != ExitCode::SUCCESS {
-                error!("The command returned exited with an error code");
-                error!("Not executing further post-create commands");
-                return Err(rc);
-            }
-        }
-        Ok(())
-    }
 }
 
 pub fn determine_env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Option<String> {
