@@ -1,6 +1,7 @@
 pub mod create;
 pub mod pack;
 pub mod run;
+pub mod unpack;
 
 use crate::csmrc::Config;
 use crate::micromamba::{self, MicromambaResult, micromamba};
@@ -26,7 +27,7 @@ pub enum Subcommand {
     /// Create an archive from an environment. Requires `conda-pack` to be in the environment.
     Pack(pack::Args),
     /// Unpack an archive to create an environment from it.
-    Unpack(UnpackArgs),
+    Unpack(unpack::Args),
     /// List existing environments
     List,
     /// Display information about the micromamba setup
@@ -49,16 +50,6 @@ pub struct CommonEnvArgs {
         default_value = "robotmk-env.yaml"
     )]
     env_file: PathBuf,
-}
-
-#[derive(Debug, clap::Args)]
-pub struct UnpackArgs {
-    /// Common environment arguments
-    #[command(flatten)]
-    common: CommonEnvArgs,
-    /// Path to a packed environment archive (ending in .tar.gz)
-    #[arg(value_name = "ARCHIVE")]
-    archive_path: PathBuf,
 }
 
 /// Contains the fields we need from a parsed environment file.
