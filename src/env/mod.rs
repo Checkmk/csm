@@ -1,4 +1,5 @@
 pub mod create;
+pub mod run;
 
 use crate::csmrc::Config;
 use crate::micromamba::{self, MicromambaResult, micromamba};
@@ -20,7 +21,7 @@ pub enum Subcommand {
     /// Deactivate an environment
     Deactivate,
     /// Run an executable in an environment
-    Run(RunArgs),
+    Run(run::Args),
     /// Create an archive from an environment. Requires `conda-pack` to be in the environment.
     Pack(PackArgs),
     /// Unpack an archive to create an environment from it.
@@ -47,18 +48,6 @@ pub struct CommonEnvArgs {
         default_value = "robotmk-env.yaml"
     )]
     env_file: PathBuf,
-}
-
-#[derive(Debug, clap::Args)]
-pub struct RunArgs {
-    #[command(flatten)]
-    common: CommonEnvArgs,
-    /// The command to run
-    #[arg(value_name = "COMMAND")]
-    command: String,
-    /// Arguments to pass to the command
-    #[arg(value_name = "ARGS")]
-    arguments: Vec<String>,
 }
 
 #[derive(Debug, clap::Args)]
