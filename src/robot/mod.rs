@@ -4,12 +4,12 @@ use std::fs::{DirBuilder, File};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-const DOT_GITIGNORE: &[u8] = include_bytes!("../robot-skel/.gitignore");
-const ROBOTMK_ENV: &[u8] = include_bytes!("../robot-skel/robotmk-env.yaml");
-const ROBOTMK_SETUP: &[u8] = include_bytes!("../robot-skel/robotmk-setup.yaml");
-const ROBOT_TOML: &[u8] = include_bytes!("../robot-skel/robot.toml");
-const DOT_ROBOT_TOML: &[u8] = include_bytes!("../robot-skel/.robot.toml");
-const SAMPLE_ROBOT: &[u8] = include_bytes!("../robot-skel/sample.robot");
+const DOT_GITIGNORE: &[u8] = include_bytes!("../../robot-skel/.gitignore");
+const ROBOTMK_ENV: &[u8] = include_bytes!("../../robot-skel/robotmk-env.yaml");
+const ROBOTMK_SETUP: &[u8] = include_bytes!("../../robot-skel/robotmk-setup.yaml");
+const ROBOT_TOML: &[u8] = include_bytes!("../../robot-skel/robot.toml");
+const DOT_ROBOT_TOML: &[u8] = include_bytes!("../../robot-skel/.robot.toml");
+const SAMPLE_ROBOT: &[u8] = include_bytes!("../../robot-skel/sample.robot");
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
