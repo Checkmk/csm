@@ -1,9 +1,9 @@
-use crate::env::CommonEnvArgs;
+use crate::env::CommonArgs;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
     #[command(flatten)]
-    pub common: CommonEnvArgs,
+    pub common: CommonArgs,
     /// The command to run
     #[arg(value_name = "COMMAND")]
     pub command: String,

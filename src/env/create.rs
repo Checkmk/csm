@@ -1,11 +1,11 @@
-use crate::env::CommonEnvArgs;
+use crate::env::CommonArgs;
 
 use std::path::PathBuf;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
     #[command(flatten)]
-    pub common: CommonEnvArgs,
+    pub common: CommonArgs,
 
     /// If specified, overrides the post-creation setup file [default: robotmk-setup.yaml]
     #[arg(long = "setup-file", value_name = "PATH")]
