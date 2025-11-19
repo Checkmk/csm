@@ -1,3 +1,5 @@
+pub mod create;
+
 use crate::csmrc::Config;
 use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
@@ -12,7 +14,7 @@ use std::process::ExitCode;
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
     /// Create an environment
-    Create(CreateArgs),
+    Create(create::Args),
     /// Activate an environment
     Activate(CommonEnvArgs),
     /// Deactivate an environment
@@ -45,16 +47,6 @@ pub struct CommonEnvArgs {
         default_value = "robotmk-env.yaml"
     )]
     env_file: PathBuf,
-}
-
-#[derive(Debug, clap::Args)]
-pub struct CreateArgs {
-    #[command(flatten)]
-    common: CommonEnvArgs,
-
-    /// If specified, overrides the post-creation setup file [default: robotmk-setup.yaml]
-    #[arg(long = "setup-file", value_name = "PATH")]
-    setup_file: Option<PathBuf>,
 }
 
 #[derive(Debug, clap::Args)]
