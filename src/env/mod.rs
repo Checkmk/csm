@@ -1,5 +1,6 @@
 pub mod activate;
 pub mod create;
+pub mod deactivate;
 pub mod pack;
 pub mod parsing;
 pub mod run;
@@ -8,7 +9,6 @@ pub mod unpack;
 use crate::csmrc::Config;
 use crate::env::parsing::env_file::RobotmkEnv;
 use crate::micromamba::{self, MicromambaResult, micromamba};
-use crate::shell::SupportedShell;
 
 use log::{debug, error, info};
 use std::fs;
@@ -123,18 +123,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
         Subcommand::Run(args) => run::run(config, args),
         Subcommand::Activate(args) => activate::run(config, args),
-        Subcommand::Deactivate => {
-            let Some(shell) = SupportedShell::from_csm_hook() else {
-                error!("Your shell does not appear to have the csm hook enabled");
-                error!("See 'csm init' for information on how to set up the hook");
-                return Err(ExitCode::FAILURE);
-            };
-            println!("{}", shell.restore_and_unset_env_var("PATH"));
-            println!("{}", shell.restore_and_unset_env_var("CONDA_DEFAULT_ENV"));
-            println!("{}", shell.restore_and_unset_env_var("CONDA_PREFIX"));
-            println!("{}", shell.restore_and_unset_env_var("CONDA_SHLVL"));
-            Ok(())
-        }
+        Subcommand::Deactivate => deactivate::run(),
         Subcommand::Pack(args) => {
             let env_name = env_name(args.common.name, &args.common.env_file)?;
             let Some(bin_path) = micromamba::bin_path_for_env(&config, &env_name) else {
