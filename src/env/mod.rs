@@ -6,7 +6,7 @@ pub mod run;
 pub mod unpack;
 
 use crate::csmrc::Config;
-use crate::env::parsing::env_file::parse_env_yaml;
+use crate::env::parsing::env_file::RobotmkEnv;
 use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
@@ -104,9 +104,9 @@ pub fn determine_env_name(explicit_name: Option<String>, env_yaml_path: &Path) -
     }
 
     // Fallback 1: Look for a name key in robotmk-env.yaml
-    // We ignore errors from parse_env_yaml() here, we'll fall back
+    // We ignore errors from from_path() here, we'll fall back
     // below if we can't parse it for some reason
-    if let Ok(env) = parse_env_yaml(env_yaml_path)
+    if let Ok(env) = RobotmkEnv::from_path(env_yaml_path)
         && let Some(name) = env.name
     {
         debug!("Using '{}' as env name, found in {:?}", name, env_yaml_path);

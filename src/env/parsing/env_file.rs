@@ -9,8 +9,10 @@ pub struct RobotmkEnv {
     pub name: Option<String>,
 }
 
-/// Attempt to parse an environment file.
-pub fn parse_env_yaml<P: AsRef<Path>>(path: P) -> Result<RobotmkEnv, std::io::Error> {
-    let contents = std::fs::read_to_string(path)?;
-    serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+impl RobotmkEnv {
+    /// Attempt to parse an environment file.
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        let contents = std::fs::read_to_string(path)?;
+        serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    }
 }
