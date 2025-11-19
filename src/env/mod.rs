@@ -1,10 +1,12 @@
 pub mod activate;
 pub mod create;
 pub mod pack;
+pub mod parsing;
 pub mod run;
 pub mod unpack;
 
 use crate::csmrc::Config;
+use crate::env::parsing::env_file::parse_env_yaml;
 use crate::micromamba::{self, MicromambaResult, micromamba};
 use crate::shell::SupportedShell;
 
@@ -53,13 +55,6 @@ pub struct CommonEnvArgs {
     env_file: PathBuf,
 }
 
-/// Contains the fields we need from a parsed environment file.
-#[derive(Deserialize)]
-struct RobotmkEnv {
-    /// The name of the environment
-    name: Option<String>,
-}
-
 /// Contains the fields we need from a parsed setup file.
 #[derive(Deserialize)]
 struct RobotmkSetup {
@@ -99,12 +94,6 @@ impl RobotmkSetup {
         }
         Ok(())
     }
-}
-
-/// Attempt to parse an environment file.
-fn parse_env_yaml<P: AsRef<Path>>(path: P) -> Result<RobotmkEnv, std::io::Error> {
-    let contents = std::fs::read_to_string(path)?;
-    serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
 }
 
 pub fn determine_env_name(explicit_name: Option<String>, env_yaml_path: &Path) -> Option<String> {
