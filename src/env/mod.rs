@@ -124,49 +124,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::Run(args) => run::run(config, args),
         Subcommand::Activate(args) => activate::run(config, args),
         Subcommand::Deactivate => deactivate::run(),
-        Subcommand::Pack(args) => {
-            let env_name = env_name(args.common.name, &args.common.env_file)?;
-            let Some(bin_path) = micromamba::bin_path_for_env(&config, &env_name) else {
-                error!(
-                    "Could not determine binary path for environment '{}'",
-                    &env_name
-                );
-                return Err(ExitCode::FAILURE);
-            };
-            let binary_name = if cfg!(windows) {
-                "conda-pack.exe"
-            } else {
-                "conda-pack"
-            };
-            let conda_pack = bin_path.join(binary_name);
-            if !conda_pack.exists() {
-                debug!("Path does not exist: {:?}", conda_pack);
-                error!(
-                    "conda-pack was not found in the environment. It must be installed to use this command."
-                );
-                return Err(ExitCode::FAILURE);
-            }
-            let Some(env_path) = micromamba::path_for_env(&config, &env_name) else {
-                error!("Could not determine path for environment '{}'", env_name);
-                return Err(ExitCode::FAILURE);
-            };
-            let output = args.output.unwrap_or(format!("{}.tar.gz", env_name));
-            micromamba(
-                &config,
-                vec![
-                    "run",
-                    "--name",
-                    &env_name,
-                    &binary_name,
-                    "--prefix",
-                    &env_path.to_string_lossy(),
-                    "--output",
-                    &output,
-                ],
-                true,
-            )
-            .into()
-        }
+        Subcommand::Pack(args) => pack::run(config, args),
         Subcommand::Unpack(args) => {
             fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
                 let filename = archive_path.file_name()?.to_str()?;
