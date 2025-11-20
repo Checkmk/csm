@@ -20,24 +20,8 @@ pub struct MicromambaInfo {
     pub env_location: String,
 }
 
-/// Return a [`Command`] ready to shell out to `micromamba` with the appropriate
-/// environment variables set based on configuration.
-fn micromamba_at(path: &str, config: &Config, args: &Vec<&str>) -> Command {
-    let mut env_vars: HashMap<&str, String> = HashMap::new();
-
-    if let Some(mamba_root_prefix) = &config.mamba_root_prefix {
-        env_vars.insert("MAMBA_ROOT_PREFIX", mamba_root_prefix.to_string());
-    }
-
-    let mut cmd = Command::new(path);
-    cmd.args(args);
-    cmd.envs(env_vars);
-    if config.noop_mode {
-        info!("Would run: {:?}", cmd);
-    } else {
-        debug!("About to run: {:?}", cmd);
-    }
-    cmd
+struct Micromamba<'a> {
+    config: &'a Config,
 }
 
 fn block_on_child_exit(child: &mut std::process::Child) -> MicromambaResult {
@@ -84,81 +68,112 @@ fn exec_micromamba(cmd: &mut Command, stream_output: bool) -> MicromambaResult {
     }
 }
 
-/// Run `micromamba` and return the result, if able.
-///
-/// We need a `micromamba` binary to work with. If one is not present, attempt
-/// to download and install `micromamba` into the user's cache directory.
-///
-/// 1. If there is already a `micromamba` command in $PATH, we use it.
-/// 2. Otherwise, download micromamba and install it somewhere in the user
-///    cache directory. (We cannot rely on this - it could be that the user's
-///    cache directory is mounted noexec or similar, but we try.)
-///
-/// Alternative approaches that we do not take here currently:
-/// - On Linux, we *could* in theory use memfd_create + fexecve to embed the app
-///   and run it from memory. This won't work on Windows.
-///
-/// - We *could* embed the micromamba binary in our binary (Windows or Linux
-///   based on compile target) and write it to the user cache directory rather
-///   than downloading it. But this inflates our binary size.
+impl<'a> Micromamba<'a> {
+    pub fn new(config: &'a Config) -> Self {
+        Self { config }
+    }
+
+    /// Return a [`Command`] ready to shell out to `micromamba` with the appropriate
+    /// environment variables set based on configuration.
+    fn micromamba_at(&self, path: &str, args: &Vec<&str>) -> Command {
+        let mut env_vars: HashMap<&str, String> = HashMap::new();
+
+        if let Some(mamba_root_prefix) = &self.config.mamba_root_prefix {
+            env_vars.insert("MAMBA_ROOT_PREFIX", mamba_root_prefix.to_string());
+        }
+
+        let mut cmd = Command::new(path);
+        cmd.args(args);
+        cmd.envs(env_vars);
+        if self.config.noop_mode {
+            info!("Would run: {:?}", cmd);
+        } else {
+            debug!("About to run: {:?}", cmd);
+        }
+        cmd
+    }
+
+    /// Run `micromamba` and return the result, if able.
+    ///
+    /// We need a `micromamba` binary to work with. If one is not present, attempt
+    /// to download and install `micromamba` into the user's cache directory.
+    ///
+    /// 1. If there is already a `micromamba` command in $PATH, we use it.
+    /// 2. Otherwise, download micromamba and install it somewhere in the user
+    ///    cache directory. (We cannot rely on this - it could be that the user's
+    ///    cache directory is mounted noexec or similar, but we try.)
+    ///
+    /// Alternative approaches that we do not take here currently:
+    /// - On Linux, we *could* in theory use memfd_create + fexecve to embed the app
+    ///   and run it from memory. This won't work on Windows.
+    ///
+    /// - We *could* embed the micromamba binary in our binary (Windows or Linux
+    ///   based on compile target) and write it to the user cache directory rather
+    ///   than downloading it. But this inflates our binary size.
+    pub fn micromamba(&self, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
+        let mut cmd = self.micromamba_at("micromamba", &args);
+
+        if self.config.noop_mode {
+            // Do nothing. micromamba_at() already logged what we're about to run.
+            return MicromambaResult::Noop;
+        }
+
+        // If we were able to get a result using micromamba found in $PATH, then
+        // we're done.
+        match exec_micromamba(&mut cmd, stream_output) {
+            ok @ (MicromambaResult::StreamedOutput(_) | MicromambaResult::CapturedOutput(_)) => {
+                debug!("Ran micromamba found in $PATH");
+                return ok;
+            }
+            MicromambaResult::CouldNotRun => {
+                // In this case, bail out and let the user fix their micromamba
+                // installation.
+                debug!("micromamba found in $PATH could not be run, aborting");
+                return MicromambaResult::CouldNotRun;
+            }
+            _ => {}
+        }
+
+        // If we weren't successful there, we download micromamba to the user cache
+        // directory.
+        debug!("micromamba not found in $PATH, falling back to cache");
+        let downloaded_path = match download_micromamba(self.config) {
+            Ok(path) => path,
+            Err(e) => {
+                error!("Could not download micromamba: {}", e);
+                return MicromambaResult::CouldNotRun;
+            }
+        };
+        let mut cmd = self.micromamba_at(&downloaded_path.to_string_lossy(), &args);
+        match exec_micromamba(&mut cmd, stream_output) {
+            ok @ (MicromambaResult::StreamedOutput(_) | MicromambaResult::CapturedOutput(_)) => {
+                debug!(
+                    "Ran downloaded/cached micromamba at {}",
+                    downloaded_path.display()
+                );
+                return ok;
+            }
+            MicromambaResult::CouldNotRun => {
+                debug!(
+                    "Downloaded micromamba at {} could not be run",
+                    downloaded_path.display()
+                );
+            }
+            _ => {}
+        }
+
+        // Finally, if we couldn't run the downloaded one either, just bail out
+        error!("Could not find a suitable micromamba binary to run");
+        error!(
+            "Please install micromamba manually, ensure it is executable, and place it somewhere in $PATH"
+        );
+        MicromambaResult::CouldNotRun
+    }
+}
+
+/// Temporary wrapper function that creates a `Micromamba` instance and calls `micromamba()` on it.
 pub fn micromamba(config: &Config, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
-    let mut cmd = micromamba_at("micromamba", config, &args);
-
-    if config.noop_mode {
-        // Do nothing. micromamba_at() already logged what we're about to run.
-        return MicromambaResult::Noop;
-    }
-
-    // If we were able to get a result using micromamba found in $PATH, then
-    // we're done.
-    match exec_micromamba(&mut cmd, stream_output) {
-        ok @ (MicromambaResult::StreamedOutput(_) | MicromambaResult::CapturedOutput(_)) => {
-            debug!("Ran micromamba found in $PATH");
-            return ok;
-        }
-        MicromambaResult::CouldNotRun => {
-            // In this case, bail out and let the user fix their micromamba
-            // installation.
-            debug!("micromamba found in $PATH could not be run, aborting");
-            return MicromambaResult::CouldNotRun;
-        }
-        _ => {}
-    }
-
-    // If we weren't successful there, we download micromamba to the user cache
-    // directory.
-    debug!("micromamba not found in $PATH, falling back to cache");
-    let downloaded_path = match download_micromamba(config) {
-        Ok(path) => path,
-        Err(e) => {
-            error!("Could not download micromamba: {}", e);
-            return MicromambaResult::CouldNotRun;
-        }
-    };
-    let mut cmd = micromamba_at(&downloaded_path.to_string_lossy(), config, &args);
-    match exec_micromamba(&mut cmd, stream_output) {
-        ok @ (MicromambaResult::StreamedOutput(_) | MicromambaResult::CapturedOutput(_)) => {
-            debug!(
-                "Ran downloaded/cached micromamba at {}",
-                downloaded_path.display()
-            );
-            return ok;
-        }
-        MicromambaResult::CouldNotRun => {
-            debug!(
-                "Downloaded micromamba at {} could not be run",
-                downloaded_path.display()
-            );
-        }
-        _ => {}
-    }
-
-    // Finally, if we couldn't run the downloaded one either, just bail out
-    error!("Could not find a suitable micromamba binary to run");
-    error!(
-        "Please install micromamba manually, ensure it is executable, and place it somewhere in $PATH"
-    );
-    MicromambaResult::CouldNotRun
+    Micromamba::new(config).micromamba(args, stream_output)
 }
 
 /// Query micromamba to try to determine the path for an environment
