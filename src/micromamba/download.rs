@@ -73,6 +73,23 @@ fn csm_cache_dir(config: &Config) -> io::Result<PathBuf> {
     Ok(cache)
 }
 
+/// Determine the download URL for micromamba
+fn micromamba_url() -> Result<String, DownloadError> {
+    // TODO: Do we need to worry about other architectures (aarch64) in addition to OS?
+    let os = if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "windows") {
+        "win"
+    } else {
+        return Err(DownloadError::IncompatibleOS);
+    };
+
+    Ok(format!(
+        "https://micro.mamba.pm/api/micromamba/{}-64/latest",
+        os
+    ))
+}
+
 /// Attempt to download micromamba and store it in the user's cache directory.
 ///
 /// If the file already exists in the cache directory, return the location to
@@ -85,18 +102,9 @@ pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
         return Ok(micromamba_path);
     }
 
-    // TODO: Do we need to worry about other architectures (aarch64) in addition to OS?
-    let os = if cfg!(target_os = "linux") {
-        "linux"
-    } else if cfg!(target_os = "windows") {
-        "win"
-    } else {
-        return Err(DownloadError::IncompatibleOS);
-    };
-
-    let url = format!("https://micro.mamba.pm/api/micromamba/{}-64/latest", os);
-    debug!("Going to download {}", url);
+    let url = micromamba_url()?;
     info!("micromamba was not found on path; downloading it now");
+    debug!("Going to download {}", url);
 
     if !config.download_micromamba {
         return Err(DownloadError::DownloadDisabled);
