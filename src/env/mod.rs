@@ -8,7 +8,8 @@ pub mod unpack;
 
 use crate::csmrc::Config;
 use crate::env::parsing::env_file::RobotmkEnv;
-use crate::micromamba::{MicromambaResult, micromamba};
+use crate::micromamba::micromamba;
+use crate::micromamba::result::MicromambaResult;
 
 use log::{debug, error, info};
 use std::path::{Component, Path, PathBuf};
