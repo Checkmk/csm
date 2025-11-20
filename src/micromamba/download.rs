@@ -3,7 +3,7 @@ use crate::csmrc::Config;
 use log::{debug, info};
 use std::fmt;
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 pub enum DownloadError {
@@ -90,32 +90,13 @@ fn micromamba_url() -> Result<String, DownloadError> {
     ))
 }
 
-/// Attempt to download micromamba and store it in the user's cache directory.
-///
-/// If the file already exists in the cache directory, return the location to
-/// it. Otherwise, download it first and then return the location to it.
-pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
+/// Given a tar archive, try to extract micromamba from it
+fn extract_micromamba<R: Read>(
+    config: &Config,
+    mut tar_archive: tar::Archive<R>,
+) -> Result<PathBuf, DownloadError> {
     let micromamba_exe = micromamba_executable_name()?;
     let micromamba_path = csm_cache_dir(config)?.join(micromamba_exe);
-
-    if micromamba_path.exists() {
-        return Ok(micromamba_path);
-    }
-
-    let url = micromamba_url()?;
-    info!("micromamba was not found on path; downloading it now");
-    debug!("Going to download {}", url);
-
-    if !config.download_micromamba {
-        return Err(DownloadError::DownloadDisabled);
-    }
-
-    let response_tarbz2 = reqwest::blocking::get(url)?;
-    debug!("Download completed, sending it to BzDecoder");
-    let bz2_decoder = bzip2::read::BzDecoder::new(response_tarbz2);
-    let mut tar_archive = tar::Archive::new(bz2_decoder);
-
-    debug!("Looking for bin/micromamba in the tarfile");
     let archive_binary_path = if cfg!(target_os = "linux") {
         Path::new("bin").join("micromamba")
     } else if cfg!(target_os = "windows") {
@@ -149,4 +130,33 @@ pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
     }
 
     Err(DownloadError::BinNotInArchive)
+}
+
+/// Attempt to download micromamba and store it in the user's cache directory.
+///
+/// If the file already exists in the cache directory, return the location to
+/// it. Otherwise, download it first and then return the location to it.
+pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
+    let micromamba_exe = micromamba_executable_name()?;
+    let micromamba_path = csm_cache_dir(config)?.join(micromamba_exe);
+
+    if micromamba_path.exists() {
+        return Ok(micromamba_path);
+    }
+
+    let url = micromamba_url()?;
+    info!("micromamba was not found on path; downloading it now");
+    debug!("Going to download {}", url);
+
+    if !config.download_micromamba {
+        return Err(DownloadError::DownloadDisabled);
+    }
+
+    let response_tarbz2 = reqwest::blocking::get(url)?;
+    debug!("Download completed, sending it to BzDecoder");
+    let bz2_decoder = bzip2::read::BzDecoder::new(response_tarbz2);
+    let tar_archive = tar::Archive::new(bz2_decoder);
+
+    debug!("Looking for bin/micromamba in the tarfile");
+    extract_micromamba(config, tar_archive)
 }
