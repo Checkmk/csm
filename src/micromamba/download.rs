@@ -90,13 +90,38 @@ fn micromamba_url() -> Result<String, DownloadError> {
     ))
 }
 
+/// Write the executable from the micromamba archive, to the cache directory on
+/// disk.
+fn write_micromamba<R: Read>(
+    config: &Config,
+    mut entry: tar::Entry<R>,
+) -> Result<PathBuf, DownloadError> {
+    let micromamba_exe = micromamba_executable_name()?;
+    let micromamba_path = csm_cache_dir(config)?.join(micromamba_exe);
+
+    debug!(
+        "Writing micromamba to disk at {}",
+        micromamba_path.display()
+    );
+    let mut out = fs::File::create(&micromamba_path)?;
+    io::copy(&mut entry, &mut out)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = out.metadata()?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&micromamba_path, perms)?;
+    }
+
+    Ok(micromamba_path)
+}
+
 /// Given a tar archive, try to extract micromamba from it
 fn extract_micromamba<R: Read>(
     config: &Config,
     mut tar_archive: tar::Archive<R>,
 ) -> Result<PathBuf, DownloadError> {
-    let micromamba_exe = micromamba_executable_name()?;
-    let micromamba_path = csm_cache_dir(config)?.join(micromamba_exe);
     let archive_binary_path = if cfg!(target_os = "linux") {
         Path::new("bin").join("micromamba")
     } else if cfg!(target_os = "windows") {
@@ -106,26 +131,11 @@ fn extract_micromamba<R: Read>(
     };
 
     for entry in tar_archive.entries()? {
-        let mut entry = entry?;
+        let entry = entry?;
         if let Ok(path) = entry.path()
             && path == archive_binary_path
         {
-            debug!(
-                "Found it, writing it to disk at {}",
-                micromamba_path.display()
-            );
-            let mut out = fs::File::create(&micromamba_path)?;
-            io::copy(&mut entry, &mut out)?;
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut perms = out.metadata()?.permissions();
-                perms.set_mode(0o755);
-                fs::set_permissions(&micromamba_path, perms)?;
-            }
-
-            return Ok(micromamba_path);
+            return write_micromamba(config, entry);
         }
     }
 
