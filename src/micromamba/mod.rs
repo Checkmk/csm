@@ -93,6 +93,21 @@ impl<'a> Micromamba<'a> {
         cmd
     }
 
+    /// Execute micromamba and stream the output to the console.
+    ///
+    /// Standard input is inherited from the calling console.
+    pub fn stream(&self, args: Vec<&str>) -> MicromambaResult {
+        self.micromamba(args, true)
+    }
+
+    /// Execute micromamba and capture the output, to be displayed in the envent
+    /// of an error.
+    ///
+    /// Standard input is dropped.
+    pub fn capture(&self, args: Vec<&str>) -> MicromambaResult {
+        self.micromamba(args, false)
+    }
+
     /// Run `micromamba` and return the result, if able.
     ///
     /// We need a `micromamba` binary to work with. If one is not present, attempt
@@ -110,7 +125,7 @@ impl<'a> Micromamba<'a> {
     /// - We *could* embed the micromamba binary in our binary (Windows or Linux
     ///   based on compile target) and write it to the user cache directory rather
     ///   than downloading it. But this inflates our binary size.
-    pub fn micromamba(&self, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
+    fn micromamba(&self, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
         let mut cmd = self.micromamba_at("micromamba", &args);
 
         if self.config.noop_mode {
@@ -173,7 +188,11 @@ impl<'a> Micromamba<'a> {
 
 /// Temporary wrapper function that creates a `Micromamba` instance and calls `micromamba()` on it.
 pub fn micromamba(config: &Config, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
-    Micromamba::new(config).micromamba(args, stream_output)
+    let micromamba = Micromamba::new(config);
+    match stream_output {
+        true => micromamba.stream(args),
+        false => micromamba.capture(args),
+    }
 }
 
 /// Query micromamba to try to determine the path for an environment
