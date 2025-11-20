@@ -236,30 +236,3 @@ impl<'a> Micromamba<'a> {
         Ok(env_path)
     }
 }
-
-/// Temporary wrapper function that creates a `Micromamba` instance and calls `micromamba()` on it.
-pub fn micromamba(config: &Config, args: Vec<&str>, stream_output: bool) -> MicromambaResult {
-    let micromamba = Micromamba::new(config);
-    match stream_output {
-        true => micromamba.stream(args),
-        false => micromamba.capture(args),
-    }
-}
-
-/// Temporary wrapper function that creates a `Micromamba` instance and calls `path_for_env()` on
-/// it.
-pub fn path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
-    Micromamba::new(config).path_for_env(name)
-}
-
-/// Temporary wrapper function that creates a `Micromamba` instance and calls `bin_path_for_env()`
-/// on it.
-pub fn bin_path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
-    Micromamba::new(config).bin_path_for_env(name)
-}
-
-/// Temporary wrapper function that creates a `Micromamba` instance and calls `create_env_dir()` on
-/// it.
-pub fn create_env_dir(config: &Config, name: &str) -> Result<PathBuf, std::io::Error> {
-    Micromamba::new(config).create_env_dir(name)
-}
