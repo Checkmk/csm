@@ -1,6 +1,5 @@
-use crate::csmrc::Config;
 use crate::env::{CommonArgs, dump_micromamba_captured_output_on_error};
-use crate::micromamba::{self, micromamba};
+use crate::micromamba::Micromamba;
 
 use log::{debug, error, info};
 use std::fs;
@@ -25,7 +24,7 @@ fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
         .map(String::from)
 }
 
-pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
+pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
     let env_name = match args.common.name {
         Some(name) => name,
         None => match archive_name_to_env_name(&args.archive_path) {
@@ -46,7 +45,7 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
     };
 
     // TODO: We really need a more generic error type to avoid this kind of mapping everywhere
-    let target_env_path = micromamba::create_env_dir(&config, &env_name).map_err(|e| {
+    let target_env_path = micromamba.create_env_dir(&env_name).map_err(|e| {
         error!("{}", e);
         ExitCode::FAILURE
     })?;
@@ -78,11 +77,7 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
     );
 
     info!("Running 'conda-unpack' in the new environment to fix paths...");
-    let result = micromamba(
-        &config,
-        vec!["run", "--name", &env_name, "conda-unpack"],
-        config.verbose,
-    );
+    let result = micromamba.stream_if_verbose(vec!["run", "--name", &env_name, "conda-unpack"]);
     let rc = result.exit_code();
     dump_micromamba_captured_output_on_error(&result, rc);
     result.into()
