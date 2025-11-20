@@ -117,11 +117,10 @@ fn write_micromamba<R: Read>(
     Ok(micromamba_path)
 }
 
-/// Given a tar archive, try to extract micromamba from it
-fn extract_micromamba<R: Read>(
-    config: &Config,
-    mut tar_archive: tar::Archive<R>,
-) -> Result<PathBuf, DownloadError> {
+/// Given a tar archive, find the `Entry` of the micromamba binary and return it
+fn find_micromamba_in_archive<'a, R: Read>(
+    tar_archive: &'a mut tar::Archive<R>,
+) -> Result<tar::Entry<'a, R>, DownloadError> {
     let archive_binary_path = if cfg!(target_os = "linux") {
         Path::new("bin").join("micromamba")
     } else if cfg!(target_os = "windows") {
@@ -135,7 +134,7 @@ fn extract_micromamba<R: Read>(
         if let Ok(path) = entry.path()
             && path == archive_binary_path
         {
-            return write_micromamba(config, entry);
+            return Ok(entry);
         }
     }
 
@@ -165,8 +164,9 @@ pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
     let response_tarbz2 = reqwest::blocking::get(url)?;
     debug!("Download completed, sending it to BzDecoder");
     let bz2_decoder = bzip2::read::BzDecoder::new(response_tarbz2);
-    let tar_archive = tar::Archive::new(bz2_decoder);
+    let mut tar_archive = tar::Archive::new(bz2_decoder);
 
     debug!("Looking for bin/micromamba in the tarfile");
-    extract_micromamba(config, tar_archive)
+    let entry = find_micromamba_in_archive(&mut tar_archive)?;
+    write_micromamba(config, entry)
 }
