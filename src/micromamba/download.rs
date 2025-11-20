@@ -1,6 +1,7 @@
 use crate::csmrc::Config;
 
 use log::{debug, info};
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -25,8 +26,8 @@ impl From<reqwest::Error> for DownloadError {
     }
 }
 
-impl std::fmt::Display for DownloadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for DownloadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DownloadError::IncompatibleOS => write!(f, "Incompatible OS for micromamba download"),
             DownloadError::BinNotInArchive => {
@@ -43,7 +44,7 @@ impl std::fmt::Display for DownloadError {
 }
 
 /// Attempt to create the cache directory if necessary, then return it.
-fn csm_cache_dir(config: &Config) -> std::io::Result<PathBuf> {
+fn csm_cache_dir(config: &Config) -> io::Result<PathBuf> {
     let cache = match &config.cache_dir {
         Some(cache_dir) => PathBuf::from(cache_dir),
         _ => match dirs::cache_dir().map(|p| p.join("csm")) {
