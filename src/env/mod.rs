@@ -123,7 +123,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::Create(args) => create::run(micromamba, args),
         Subcommand::List => micromamba.stream(vec!["env", "list"]).into(),
         Subcommand::Info => micromamba.stream(vec!["info"]).into(),
-        Subcommand::Run(args) => run::run(config, args),
+        Subcommand::Run(args) => run::run(micromamba, args),
         Subcommand::Activate(args) => activate::run(config, args),
         Subcommand::Deactivate => deactivate::run(),
         Subcommand::Pack(args) => pack::run(config, args),
