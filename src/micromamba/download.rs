@@ -43,6 +43,18 @@ impl fmt::Display for DownloadError {
     }
 }
 
+/// OS-target-specific: Return the final executable name
+#[inline]
+const fn micromamba_executable_name() -> Result<&'static str, DownloadError> {
+    if cfg!(target_os = "linux") {
+        Ok("micromamba")
+    } else if cfg!(target_os = "windows") {
+        Ok("micromamba.exe")
+    } else {
+        Err(DownloadError::IncompatibleOS)
+    }
+}
+
 /// Attempt to create the cache directory if necessary, then return it.
 fn csm_cache_dir(config: &Config) -> io::Result<PathBuf> {
     let cache = match &config.cache_dir {
@@ -66,14 +78,8 @@ fn csm_cache_dir(config: &Config) -> io::Result<PathBuf> {
 /// If the file already exists in the cache directory, return the location to
 /// it. Otherwise, download it first and then return the location to it.
 pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
-    let cache_dir = csm_cache_dir(config)?;
-    let micromamba_path = if cfg!(target_os = "linux") {
-        cache_dir.join("micromamba")
-    } else if cfg!(target_os = "windows") {
-        cache_dir.join("micromamba.exe")
-    } else {
-        return Err(DownloadError::IncompatibleOS);
-    };
+    let micromamba_exe = micromamba_executable_name()?;
+    let micromamba_path = csm_cache_dir(config)?.join(micromamba_exe);
 
     if micromamba_path.exists() {
         return Ok(micromamba_path);
