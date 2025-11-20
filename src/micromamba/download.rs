@@ -4,7 +4,7 @@ use log::{debug, info};
 use std::fmt;
 use std::fs;
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub enum DownloadError {
     IncompatibleOS,
@@ -121,18 +121,20 @@ fn write_micromamba<R: Read>(
 fn find_micromamba_in_archive<'a, R: Read>(
     tar_archive: &'a mut tar::Archive<R>,
 ) -> Result<tar::Entry<'a, R>, DownloadError> {
-    let archive_binary_path = if cfg!(target_os = "linux") {
-        Path::new("bin").join("micromamba")
+    let archive_binary_dir = if cfg!(target_os = "linux") {
+        PathBuf::from("bin")
     } else if cfg!(target_os = "windows") {
-        Path::new("Library").join("bin").join("micromamba.exe")
+        PathBuf::from("Library").join("bin")
     } else {
         return Err(DownloadError::IncompatibleOS);
     };
 
+    let micromamba_exe = micromamba_executable_name()?;
+
     for entry in tar_archive.entries()? {
         let entry = entry?;
         if let Ok(path) = entry.path()
-            && path == archive_binary_path
+            && path == archive_binary_dir.join(micromamba_exe)
         {
             return Ok(entry);
         }
