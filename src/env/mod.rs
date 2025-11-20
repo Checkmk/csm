@@ -8,7 +8,7 @@ pub mod unpack;
 
 use crate::csmrc::Config;
 use crate::env::parsing::env_file::RobotmkEnv;
-use crate::micromamba::micromamba;
+use crate::micromamba::Micromamba;
 use crate::micromamba::result::MicromambaResult;
 
 use log::{debug, error, info};
@@ -117,10 +117,12 @@ fn dump_micromamba_captured_output_on_error(result: &MicromambaResult, rc: ExitC
 }
 
 pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
+    let micromamba = Micromamba::new(&config);
+
     match subcommand {
         Subcommand::Create(args) => create::run(config, args),
-        Subcommand::List => micromamba(&config, vec!["env", "list"], true).into(),
-        Subcommand::Info => micromamba(&config, vec!["info"], true).into(),
+        Subcommand::List => micromamba.stream(vec!["env", "list"]).into(),
+        Subcommand::Info => micromamba.stream(vec!["info"]).into(),
         Subcommand::Run(args) => run::run(config, args),
         Subcommand::Activate(args) => activate::run(config, args),
         Subcommand::Deactivate => deactivate::run(),

@@ -20,7 +20,7 @@ pub struct MicromambaInfo {
     pub env_location: String,
 }
 
-struct Micromamba<'a> {
+pub struct Micromamba<'a> {
     config: &'a Config,
 }
 
