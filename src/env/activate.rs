@@ -1,6 +1,5 @@
-use crate::csmrc::Config;
 use crate::env::{CommonArgs, env_name};
-use crate::micromamba;
+use crate::micromamba::Micromamba;
 use crate::shell::SupportedShell;
 
 use log::{error, info};
@@ -13,7 +12,7 @@ pub struct Args {
     pub common: CommonArgs,
 }
 
-pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
+pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
     let Some(shell) = SupportedShell::from_csm_hook() else {
         error!("Your shell does not appear to have the csm hook enabled");
         error!("See 'csm init' for information on how to set up the hook");
@@ -26,7 +25,7 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
     // Use the logging macros instead for user-facing output!
 
     // Start by adding the mamba prefix bin to PATH
-    let Some(bin_path) = micromamba::bin_path_for_env(&config, &env_name) else {
+    let Some(bin_path) = micromamba.bin_path_for_env(&env_name) else {
         error!(
             "Could not determine binary path for environment '{}'",
             env_name
@@ -36,7 +35,7 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
     println!("{}", shell.prepend_path(&bin_path));
 
     // And a few conda-specific vars
-    let Some(env_path) = micromamba::path_for_env(&config, &env_name) else {
+    let Some(env_path) = micromamba.path_for_env(&env_name) else {
         error!("Could not determine path for environment '{}'", env_name);
         return Err(ExitCode::FAILURE);
     };
