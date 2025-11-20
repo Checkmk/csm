@@ -22,7 +22,7 @@ pub struct MicromambaInfo {
 
 /// Return a [`Command`] ready to shell out to `micromamba` with the appropriate
 /// environment variables set based on configuration.
-pub fn micromamba_at(path: &str, config: &Config, args: &Vec<&str>) -> Command {
+fn micromamba_at(path: &str, config: &Config, args: &Vec<&str>) -> Command {
     let mut env_vars: HashMap<&str, String> = HashMap::new();
 
     if let Some(mamba_root_prefix) = &config.mamba_root_prefix {
