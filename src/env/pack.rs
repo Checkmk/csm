@@ -1,6 +1,5 @@
-use crate::csmrc::Config;
 use crate::env::{CommonArgs, env_name};
-use crate::micromamba::{self, micromamba};
+use crate::micromamba::Micromamba;
 
 use log::{debug, error};
 use std::process::ExitCode;
@@ -17,9 +16,9 @@ pub struct Args {
     pub output: Option<String>,
 }
 
-pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
+pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
     let env_name = env_name(args.common.name, &args.common.env_file)?;
-    let Some(bin_path) = micromamba::bin_path_for_env(&config, &env_name) else {
+    let Some(bin_path) = micromamba.bin_path_for_env(&env_name) else {
         error!(
             "Could not determine binary path for environment '{}'",
             &env_name
@@ -39,14 +38,13 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
         );
         return Err(ExitCode::FAILURE);
     }
-    let Some(env_path) = micromamba::path_for_env(&config, &env_name) else {
+    let Some(env_path) = micromamba.path_for_env(&env_name) else {
         error!("Could not determine path for environment '{}'", env_name);
         return Err(ExitCode::FAILURE);
     };
     let output = args.output.unwrap_or(format!("{}.tar.gz", env_name));
-    micromamba(
-        &config,
-        vec![
+    micromamba
+        .stream(vec![
             "run",
             "--name",
             &env_name,
@@ -55,8 +53,6 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
             &env_path.to_string_lossy(),
             "--output",
             &output,
-        ],
-        true,
-    )
-    .into()
+        ])
+        .into()
 }
