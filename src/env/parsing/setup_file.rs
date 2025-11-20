@@ -1,6 +1,5 @@
-use crate::csmrc::Config;
 use crate::env::dump_micromamba_captured_output_on_error;
-use crate::micromamba::micromamba;
+use crate::micromamba::Micromamba;
 
 use log::{error, info};
 use serde::Deserialize;
@@ -28,7 +27,7 @@ impl RobotmkSetup {
         serde_yaml_ng::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     }
 
-    pub fn run_post_create(self, config: &Config, env_name: &str) -> Result<(), ExitCode> {
+    pub fn run_post_create(self, micromamba: &Micromamba, env_name: &str) -> Result<(), ExitCode> {
         for command in self.post_build_commands.unwrap_or_default() {
             info!(
                 "Start post-create: {}",
@@ -36,7 +35,7 @@ impl RobotmkSetup {
             );
             let mut args = vec!["run", "--name", &env_name];
             args.extend(command.command.iter().map(|s| s.as_str()));
-            let result = micromamba(config, args, config.verbose);
+            let result = micromamba.stream_if_verbose(args);
             let rc = result.exit_code();
             dump_micromamba_captured_output_on_error(&result, rc);
             if rc != ExitCode::SUCCESS {

@@ -1,7 +1,6 @@
-use crate::csmrc::Config;
 use crate::env::parsing::setup_file::RobotmkSetup;
 use crate::env::{CommonArgs, dump_micromamba_captured_output_on_error, env_name};
-use crate::micromamba::micromamba;
+use crate::micromamba::Micromamba;
 
 use log::{debug, error, info, warn};
 use std::io::ErrorKind;
@@ -18,7 +17,7 @@ pub struct Args {
     pub setup_file: Option<PathBuf>,
 }
 
-pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
+pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
     if let Some(path) = &args.setup_file
         && !path.exists()
     {
@@ -31,19 +30,15 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
         "Creating environment '{}' - this may take some time...",
         env_name
     );
-    let result = micromamba(
-        &config,
-        vec![
-            "env",
-            "create",
-            "--file",
-            &args.common.env_file.to_string_lossy(),
-            "--name",
-            &env_name,
-            "--yes",
-        ],
-        config.verbose,
-    );
+    let result = micromamba.stream_if_verbose(vec![
+        "env",
+        "create",
+        "--file",
+        &args.common.env_file.to_string_lossy(),
+        "--name",
+        &env_name,
+        "--yes",
+    ]);
     let rc = result.exit_code();
     dump_micromamba_captured_output_on_error(&result, rc);
     if rc == ExitCode::SUCCESS {
@@ -79,7 +74,7 @@ pub fn run(config: Config, args: Args) -> Result<(), ExitCode> {
             }
         };
         match setup {
-            Some(setup) => setup.run_post_create(&config, &env_name)?,
+            Some(setup) => setup.run_post_create(&micromamba, &env_name)?,
             None => debug!("No usable setup file, skipping post_create"),
         }
     }

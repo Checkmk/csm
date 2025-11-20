@@ -100,12 +100,22 @@ impl<'a> Micromamba<'a> {
         self.micromamba(args, true)
     }
 
-    /// Execute micromamba and capture the output, to be displayed in the envent
+    /// Execute micromamba and capture the output, to be displayed in the event
     /// of an error.
     ///
     /// Standard input is dropped.
     pub fn capture(&self, args: Vec<&str>) -> MicromambaResult {
         self.micromamba(args, false)
+    }
+
+    /// Execute micromamba and stream the output if we are running in verbose mode.
+    /// Otherwise, capture the output to be displayed in the event of an error.
+    pub fn stream_if_verbose(&self, args: Vec<&str>) -> MicromambaResult {
+        if self.config.verbose {
+            self.micromamba(args, true)
+        } else {
+            self.micromamba(args, false)
+        }
     }
 
     /// Run `micromamba` and return the result, if able.
