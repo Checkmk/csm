@@ -194,6 +194,47 @@ impl<'a> Micromamba<'a> {
         );
         MicromambaResult::CouldNotRun
     }
+
+    /// Query micromamba to try to determine the path for an environment
+    pub fn path_for_env(&self, name: &str) -> Option<PathBuf> {
+        let result = self.capture(vec!["info", "--name", name, "--json"]);
+        let MicromambaResult::CapturedOutput(output) = result else {
+            return None;
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let info: MicromambaInfo = serde_json::from_str(&stdout).ok()?;
+        Some(info.env_location.into())
+    }
+
+    /// Return an OS-specific path to where micromamba stores (most?) binaries.
+    pub fn bin_path_for_env(&self, name: &str) -> Option<PathBuf> {
+        let os_specific_bin = if cfg!(windows) { "Scripts" } else { "bin" };
+        self.path_for_env(name).map(|p| p.join(os_specific_bin))
+    }
+
+    /// Create a directory for a new environment, if it does not already exist.
+    pub fn create_env_dir(&self, name: &str) -> Result<PathBuf, std::io::Error> {
+        let env_path = match self.path_for_env(name) {
+            Some(path) => path,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Could not determine path for environment '{}'", name),
+                ));
+            }
+        };
+        if env_path.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                format!(
+                    "The target environment directory '{:?}' already exists",
+                    env_path
+                ),
+            ));
+        }
+        std::fs::create_dir_all(&env_path)?;
+        Ok(env_path)
+    }
 }
 
 /// Temporary wrapper function that creates a `Micromamba` instance and calls `micromamba()` on it.
@@ -205,43 +246,20 @@ pub fn micromamba(config: &Config, args: Vec<&str>, stream_output: bool) -> Micr
     }
 }
 
-/// Query micromamba to try to determine the path for an environment
+/// Temporary wrapper function that creates a `Micromamba` instance and calls `path_for_env()` on
+/// it.
 pub fn path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
-    let result = micromamba(config, vec!["info", "--name", name, "--json"], false);
-    let MicromambaResult::CapturedOutput(output) = result else {
-        return None;
-    };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let info: MicromambaInfo = serde_json::from_str(&stdout).ok()?;
-    Some(info.env_location.into())
+    Micromamba::new(config).path_for_env(name)
 }
 
-/// Return an OS-specific path to where micromamba stores (most?) binaries.
+/// Temporary wrapper function that creates a `Micromamba` instance and calls `bin_path_for_env()`
+/// on it.
 pub fn bin_path_for_env(config: &Config, name: &str) -> Option<PathBuf> {
-    let os_specific_bin = if cfg!(windows) { "Scripts" } else { "bin" };
-    path_for_env(config, name).map(|p| p.join(os_specific_bin))
+    Micromamba::new(config).bin_path_for_env(name)
 }
 
-/// Create a directory for a new environment, if it does not already exist.
+/// Temporary wrapper function that creates a `Micromamba` instance and calls `create_env_dir()` on
+/// it.
 pub fn create_env_dir(config: &Config, name: &str) -> Result<PathBuf, std::io::Error> {
-    let env_path = match path_for_env(config, name) {
-        Some(path) => path,
-        None => {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("Could not determine path for environment '{}'", name),
-            ));
-        }
-    };
-    if env_path.exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            format!(
-                "The target environment directory '{:?}' already exists",
-                env_path
-            ),
-        ));
-    }
-    std::fs::create_dir_all(&env_path)?;
-    Ok(env_path)
+    Micromamba::new(config).create_env_dir(name)
 }
