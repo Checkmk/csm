@@ -57,37 +57,30 @@ fn test_csm_env_info() -> Result<(), Error> {
 /// Test `csm env run`
 #[test]
 fn test_csm_env_run() -> Result<(), Error> {
+    // Be able to test both with and without the `--` separator
+    fn args(with_double_dash: bool) -> Vec<&'static str> {
+        let always_args = vec!["env", "run", "-n", "test_csm_env_run"];
+        let mut args = always_args.clone();
+        if with_double_dash {
+            args.push("--");
+        }
+        if cfg!(windows) {
+            args.extend(&["powershell", "-Command", "echo $env:CONDA_PROMPT_MODIFIER"]);
+        } else {
+            args.extend(&["sh", "-c", "echo $CONDA_PROMPT_MODIFIER"]);
+        }
+        args
+    }
+
     let mut csm = common::Csm::new()?;
     csm_env_create(&mut csm, "test_csm_env_run")?;
-    let args = if cfg!(windows) {
-        vec![
-            "env",
-            "run",
-            "-n",
-            "test_csm_env_run",
-            "--",
-            "pwsh",
-            "-Command",
-            "echo $env:CONDA_PROMPT_MODIFIER",
-        ]
-    } else {
-        vec![
-            "env",
-            "run",
-            "-n",
-            "test_csm_env_run",
-            "env",
-            "--",
-            "sh",
-            "-c",
-            "echo $CONDA_PROMPT_MODIFIER",
-        ]
-    };
-    csm.command()
-        .args(&args)
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("(test_csm_env_run)"));
+    for with_double_dash in [false, true] {
+        csm.command()
+            .args(args(with_double_dash))
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("(test_csm_env_run)"));
+    }
     Ok(())
 }
 
