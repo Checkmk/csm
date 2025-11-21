@@ -191,8 +191,11 @@ impl SupportedShell {
     /// up, and then unset the backup variable.
     pub fn restore_and_unset_env_var(&self, key: &str) -> String {
         let mut out = String::new();
-        if let Some(code) = self.restore_env_var(key) {
-            out.push_str(&code);
+        // Try to restore the env var. If no original value was stored, then the
+        // env var never existed in the first place, so just unset it.
+        match self.restore_env_var(key) {
+            Some(code) => out.push_str(&code),
+            None => out.push_str(&self.unset_env_var(key)),
         }
         let backup_key = format!("_CSM_{}_ORIG", key);
         out.push_str(&self.unset_env_var(&backup_key));
@@ -305,5 +308,26 @@ mod tests {
                 "$env:TEST_VAR = \"a value\";"
             );
         });
+    }
+
+    #[test]
+    fn test_supportedshell_restore_and_unset_env_var() {
+        assert_eq!(
+            SupportedShell::Bash.restore_and_unset_env_var("TEST_VAR_RESTORE_AND_UNSET"),
+            "unset TEST_VAR_RESTORE_AND_UNSET;unset _CSM_TEST_VAR_RESTORE_AND_UNSET_ORIG;"
+        );
+        assert_eq!(
+            SupportedShell::Fish.restore_and_unset_env_var("TEST_VAR_RESTORE_AND_UNSET"),
+            "set -e TEST_VAR_RESTORE_AND_UNSET;set -e _CSM_TEST_VAR_RESTORE_AND_UNSET_ORIG;"
+        );
+        assert_eq!(
+            SupportedShell::Zsh.restore_and_unset_env_var("TEST_VAR_RESTORE_AND_UNSET"),
+            "unset TEST_VAR_RESTORE_AND_UNSET;unset _CSM_TEST_VAR_RESTORE_AND_UNSET_ORIG;"
+        );
+        assert_eq!(
+            SupportedShell::Powershell.restore_and_unset_env_var("TEST_VAR_RESTORE_AND_UNSET"),
+            "Remove-Item Env:TEST_VAR_RESTORE_AND_UNSET -ErrorAction SilentlyContinue;Remove-Item \
+             Env:_CSM_TEST_VAR_RESTORE_AND_UNSET_ORIG -ErrorAction SilentlyContinue;"
+        );
     }
 }
