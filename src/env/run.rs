@@ -11,7 +11,11 @@ pub struct Args {
     #[arg(value_name = "COMMAND")]
     pub command: String,
     /// Arguments to pass to the command
-    #[arg(value_name = "ARGS")]
+    #[arg(
+        value_name = "ARGS",
+        trailing_var_arg = true,
+        allow_hyphen_values = true
+    )]
     pub arguments: Vec<String>,
 }
 
