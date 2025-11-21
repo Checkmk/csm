@@ -16,7 +16,7 @@ use windows_registry::LOCAL_MACHINE;
 
 #[derive(Parser, Debug)]
 #[command(version)]
-/// Checkmk synthetic monitoring command-line tool
+/// Checkmk Synthetic Monitoring command-line tool
 struct Cli {
     /// Enable verbose debugging output
     #[arg(short, long)]
@@ -32,7 +32,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Manipulate Robotmk environments
+    /// Manage Robot environments
     #[command(subcommand)]
     Env(env::Subcommand),
 
