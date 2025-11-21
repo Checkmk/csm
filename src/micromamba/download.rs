@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 pub enum DownloadError {
     IncompatibleOS,
+    IncompatibleArch,
     BinNotInArchive,
     DownloadDisabled,
     IO(io::Error),
@@ -30,6 +31,12 @@ impl fmt::Display for DownloadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DownloadError::IncompatibleOS => write!(f, "Incompatible OS for micromamba download"),
+            DownloadError::IncompatibleArch => {
+                write!(
+                    f,
+                    "Incompatible architecture/OS combination for micromamba download"
+                )
+            }
             DownloadError::BinNotInArchive => {
                 write!(f, "micromamba binary not found in downloaded archive")
             }
@@ -75,18 +82,27 @@ fn csm_cache_dir(config: &Config) -> io::Result<PathBuf> {
 
 /// Determine the download URL for micromamba
 fn micromamba_url() -> Result<String, DownloadError> {
-    // TODO: Do we need to worry about other architectures (aarch64) in addition to OS?
-    let os = if cfg!(target_os = "linux") {
-        "linux"
+    let os_arch = if cfg!(target_os = "linux") {
+        if cfg!(target_arch = "x86_64") {
+            "linux-64"
+        } else if cfg!(target_arch = "aarch64") {
+            "linux-aarch64"
+        } else {
+            return Err(DownloadError::IncompatibleArch);
+        }
     } else if cfg!(target_os = "windows") {
-        "win"
+        if cfg!(target_arch = "x86_64") {
+            "win-64"
+        } else {
+            return Err(DownloadError::IncompatibleArch);
+        }
     } else {
         return Err(DownloadError::IncompatibleOS);
     };
 
     Ok(format!(
-        "https://micro.mamba.pm/api/micromamba/{}-64/latest",
-        os
+        "https://micro.mamba.pm/api/micromamba/{}/latest",
+        os_arch
     ))
 }
 
