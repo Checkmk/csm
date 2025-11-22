@@ -28,6 +28,33 @@ fn test_csm_env_create() -> Result<(), Error> {
     Ok(())
 }
 
+/// Test `csm env delete`
+#[test]
+fn test_csm_env_delete() -> Result<(), Error> {
+    let mut csm = common::Csm::new()?;
+    csm_env_create(&mut csm, "test_csm_env_delete")?;
+    #[cfg(windows)]
+    let os_home = csm.home_dir.path().join("AppData").join("Roaming");
+    #[cfg(not(windows))]
+    let os_home = csm.home_dir.path().join(".local").join("share");
+    let env_path = os_home
+        .join("mamba")
+        .join("envs")
+        .join("test_csm_env_delete");
+    assert!(env_path.exists());
+    csm.command()
+        .args(["env", "delete", "-fn", "test_csm_env_delete"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Deleting environment 'test_csm_env_delete'",
+        ))
+        .stderr(predicate::str::contains("Done."));
+    assert!(!env_path.exists());
+
+    Ok(())
+}
+
 /// Create an environment and then test that it shows in `csm env list`
 #[test]
 fn test_csm_env_list() -> Result<(), Error> {

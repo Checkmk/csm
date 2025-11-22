@@ -1,6 +1,7 @@
 pub mod activate;
 pub mod create;
 pub mod deactivate;
+pub mod delete;
 pub mod pack;
 pub mod parsing;
 pub mod run;
@@ -19,6 +20,8 @@ use std::process::ExitCode;
 pub enum Subcommand {
     /// Create an environment
     Create(create::Args),
+    /// Remove an environment
+    Delete(delete::Args),
     /// Activate an environment
     Activate(activate::Args),
     /// Deactivate an environment
@@ -121,6 +124,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
 
     match subcommand {
         Subcommand::Create(args) => create::run(micromamba, args),
+        Subcommand::Delete(args) => delete::run(micromamba, args, &config),
         Subcommand::List => micromamba.stream(vec!["env", "list"]).into(),
         Subcommand::Info => micromamba.stream(vec!["info"]).into(),
         Subcommand::Run(args) => run::run(micromamba, args),
