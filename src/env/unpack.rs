@@ -14,6 +14,9 @@ pub struct Args {
     /// Path to a packed environment archive (ending in .tar.gz)
     #[arg(value_name = "ARCHIVE")]
     pub archive_path: PathBuf,
+    /// If an environment by the specified name already exists, delete it first
+    #[arg(short, long, action)]
+    pub force: bool,
 }
 
 fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
@@ -45,10 +48,12 @@ pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
     };
 
     // TODO: We really need a more generic error type to avoid this kind of mapping everywhere
-    let target_env_path = micromamba.create_env_dir(&env_name).map_err(|e| {
-        error!("{}", e);
-        ExitCode::FAILURE
-    })?;
+    let target_env_path = micromamba
+        .create_env_dir(&env_name, args.force)
+        .map_err(|e| {
+            error!("{}", e);
+            ExitCode::FAILURE
+        })?;
 
     // Send the archive to flate2 to decompress and untar
     info!(

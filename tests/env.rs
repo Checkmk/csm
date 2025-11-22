@@ -277,6 +277,24 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
         .success()
         .stdout(predicate::str::contains("100% Completed"));
 
+    // By default fail to unpack if the env name is already used
+    csm.command()
+        .args(["env", "unpack", "-n", "test_csm_env_pack", "packed.tar.gz"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("The target environment directory"))
+        .stderr(predicate::str::contains("already exists"));
+
+    // But with --force it should work
+    csm.command()
+        .args(["env", "unpack", "-fn", "test_csm_env_pack", "packed.tar.gz"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Unpacking"))
+        .stderr(predicate::str::contains("Running 'conda-unpack'"))
+        .stderr(predicate::str::contains("Done."));
+
+    // And when an existing env isn't involved at all, it should work
     csm.command()
         .args(["env", "unpack", "-n", "unpacked", "packed.tar.gz"])
         .assert()
