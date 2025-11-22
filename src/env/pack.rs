@@ -14,6 +14,9 @@ pub struct Args {
     /// as for the "--name" parameter, and the default name is <env_name>.tar.gz
     #[arg(long, short, value_name = "OUTPUT")]
     pub output: Option<String>,
+    /// Overwrite any existing file with the same name.
+    #[arg(long, short, action)]
+    pub force: bool,
 }
 
 pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
@@ -43,16 +46,19 @@ pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
         return Err(ExitCode::FAILURE);
     };
     let output = args.output.unwrap_or(format!("{}.tar.gz", env_name));
-    micromamba
-        .stream(vec![
-            "run",
-            "--name",
-            &env_name,
-            &binary_name,
-            "--prefix",
-            &env_path.to_string_lossy(),
-            "--output",
-            &output,
-        ])
-        .into()
+    let prefix = env_path.to_string_lossy();
+    let mut cmd_args = vec![
+        "run",
+        "--name",
+        &env_name,
+        &binary_name,
+        "--prefix",
+        &prefix,
+        "--output",
+        &output,
+    ];
+    if args.force {
+        cmd_args.push("--force");
+    }
+    micromamba.stream(cmd_args).into()
 }
