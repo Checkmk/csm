@@ -213,7 +213,9 @@ impl<'a> Micromamba<'a> {
     }
 
     /// Create a directory for a new environment, if it does not already exist.
-    pub fn create_env_dir(&self, name: &str) -> Result<PathBuf, std::io::Error> {
+    ///
+    /// If `force` is true, delete any pre-existing environment/directory at this path.
+    pub fn create_env_dir(&self, name: &str, force: bool) -> Result<PathBuf, std::io::Error> {
         let env_path = match self.path_for_env(name) {
             Some(path) => path,
             None => {
@@ -224,13 +226,21 @@ impl<'a> Micromamba<'a> {
             }
         };
         if env_path.exists() {
-            return Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                format!(
-                    "The target environment directory '{:?}' already exists",
-                    env_path
-                ),
-            ));
+            if force {
+                debug!(
+                    "Removing pre-existing directory at '{}'",
+                    env_path.display()
+                );
+                std::fs::remove_dir_all(&env_path)?;
+            } else {
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    format!(
+                        "The target environment directory '{}' already exists",
+                        env_path.display()
+                    ),
+                ));
+            }
         }
         std::fs::create_dir_all(&env_path)?;
         Ok(env_path)
