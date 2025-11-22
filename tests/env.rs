@@ -260,7 +260,7 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
     let mut csm = common::Csm::new()?;
     csm_env_create(&mut csm, "test_csm_env_pack")?;
 
-    let args = [
+    let mut args = vec![
         "env",
         "pack",
         "-n",
@@ -271,7 +271,7 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
 
     // If conda-pack isn't installed, we give a useful error
     csm.command()
-        .args(args)
+        .args(&args)
         .assert()
         .failure()
         .stderr(predicate::str::contains(
@@ -292,14 +292,25 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
         .success();
 
     csm.command()
-        .args([
-            "env",
-            "pack",
-            "-n",
-            "test_csm_env_pack",
-            "-o",
-            "packed.tar.gz",
-        ])
+        .args(&args)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("100% Completed"));
+
+    // Now the file has been created, so we can't do it again with the same name
+    // without --force
+    csm.command()
+        .args(&args)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "File 'packed.tar.gz' already exists",
+        ));
+
+    // But forcing should work.
+    args.push("--force");
+    csm.command()
+        .args(&args)
         .assert()
         .success()
         .stdout(predicate::str::contains("100% Completed"));
