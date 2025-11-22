@@ -1,4 +1,4 @@
-use crate::env::{CommonArgs, dump_micromamba_captured_output_on_error};
+use crate::env::dump_micromamba_captured_output_on_error;
 use crate::micromamba::Micromamba;
 
 use log::{debug, error, info};
@@ -8,9 +8,10 @@ use std::process::ExitCode;
 
 #[derive(Debug, clap::Args)]
 pub struct Args {
-    /// Common environment arguments
-    #[command(flatten)]
-    pub common: CommonArgs,
+    /// The name of the environment to create. By default, will be determined
+    /// from the given archive filename: <env_name>.tar.gz
+    #[arg(short, long, value_name = "ENV_NAME")]
+    pub name: Option<String>,
     /// Path to a packed environment archive (ending in .tar.gz)
     #[arg(value_name = "ARCHIVE")]
     pub archive_path: PathBuf,
@@ -25,7 +26,7 @@ fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
 }
 
 pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
-    let env_name = match args.common.name {
+    let env_name = match args.name {
         Some(name) => name,
         None => match archive_name_to_env_name(&args.archive_path) {
             Some(name) => {
