@@ -6,6 +6,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::time::Duration;
 
 pub enum DownloadError {
     IncompatibleOS,
@@ -188,7 +189,11 @@ pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
         return Err(DownloadError::DownloadDisabled);
     }
 
-    let response_tarbz2 = reqwest::blocking::get(url)?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .use_rustls_tls()
+        .build()?;
+    let response_tarbz2 = client.get(url).send()?;
     debug!("Download completed, sending it to BzDecoder");
     let bz2_decoder = bzip2::read::BzDecoder::new(response_tarbz2);
     let mut tar_archive = tar::Archive::new(bz2_decoder);
