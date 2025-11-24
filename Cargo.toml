@@ -39,3 +39,6 @@ regex = "1.12.2"
 temp-env = "0.3.6"
 tempfile = "3.0"
 which = "8.0.0"
+
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
