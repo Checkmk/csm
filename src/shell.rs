@@ -25,7 +25,7 @@ pub enum SupportedShell {
     Bash,
     #[value(aliases(["fish.exe"]))]
     Fish,
-    #[value(aliases(["pwsh", "pwsh.exe"]))]
+    #[value(aliases(["pwsh", "pwsh.exe", "powershell", "powershell.exe"]))]
     Powershell,
     #[value(aliases(["zsh.exe"]))]
     Zsh,
