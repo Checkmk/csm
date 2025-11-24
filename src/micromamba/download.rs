@@ -1,6 +1,7 @@
 use crate::csmrc::Config;
 
 use log::{debug, info};
+use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::io::{self, Read};
@@ -45,7 +46,15 @@ impl fmt::Display for DownloadError {
                 "Wanted to download micromamba, but doing so is disabled by csm configuration"
             ),
             DownloadError::IO(e) => write!(f, "IO error: {}", e),
-            DownloadError::Reqwest(e) => write!(f, "Failed to download micromamba: {}", e),
+            DownloadError::Reqwest(e) => {
+                write!(f, "Failed to download micromamba: {}", e)?;
+                let mut source = e.source();
+                while let Some(src) = source {
+                    debug!("Caused by: {}", src);
+                    source = src.source();
+                }
+                Ok(())
+            }
         }
     }
 }
