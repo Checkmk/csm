@@ -1,6 +1,13 @@
 # csm - Checkmk synthetic monitoring
 
-(Under active development, not yet usable.)
+A command-line tool to manage Robotmk environments.
+
+After installing (see the 'Releases' section on the right side of the GitHub
+repository page), run `./csm help` for usage information.
+
+There is a shell hook which can be installed to help integrate `csm` into your
+shell. After `csm` is installed (ideally somewhere in your `PATH`), see
+`csm init` for instructions on how to set up the hook.
 
 ## Configuration: `~/.csmrc`
 
@@ -16,8 +23,8 @@ available:
   this is used for storing the `micromamba` binary if it is downloaded by `csm`
   (see next option).
 
-* `download_micromamba` - A boolean, determines whether or not we should try to
-  download `micromamba` if it was not found in `$PATH`. This is mostly useful
+* `download_micromamba` - A boolean, determines whether or not `csm` should try
+  to download `micromamba` if it was not found in `$PATH`. This is mostly useful
   for testing, but could be useful if you wish to ensure `csm` never downloads
   `micromamba` even if the one in `$PATH` should disappear.
 
@@ -26,4 +33,5 @@ available:
   for LongPaths support. If not already enabled, it will try to enable it. If
   this fails (for example, because the user running `csm.exe` is not an
   administrator), `csm.exe` will prompt for confirmation before continuing.
-  Setting this configuration option to true, disables the check entirely.
+  Setting this configuration option to true, disables the check entirely. This
+  option does nothing on non-Windows systems.
