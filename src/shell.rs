@@ -10,6 +10,7 @@
 use clap::ValueEnum;
 use clap_complete::aot::Shell;
 use log::{debug, warn};
+use std::default::Default;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use sysinfo::{ProcessesToUpdate, System};
@@ -203,34 +204,45 @@ impl SupportedShell {
     }
 }
 
+#[derive(Default)]
 pub struct ShellConfiguration {
     pub profile_file: &'static str,
     pub init_command: &'static str,
     pub wrapper: &'static str,
+    pub extra_instructions: Option<&'static str>,
 }
 
 impl ShellConfiguration {
     pub fn from_supported_shell(shell: &SupportedShell) -> Self {
+        let powershell_extra = "You might also need to run the following to \
+             allow script execution on your system:
+
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted";
+
         match shell {
             SupportedShell::Bash => Self {
                 profile_file: "~/.bashrc",
                 init_command: "eval \"$(csm init bash --code)\"",
                 wrapper: BASH_WRAPPER,
+                ..Default::default()
             },
             SupportedShell::Fish => Self {
                 profile_file: "~/.config/fish/config.fish",
                 init_command: "csm init fish --code | source",
                 wrapper: FISH_WRAPPER,
+                ..Default::default()
             },
             SupportedShell::Powershell => Self {
                 profile_file: "$PROFILE",
                 init_command: "csm init powershell --code | Out-String | Invoke-Expression",
                 wrapper: PWSH_WRAPPER,
+                extra_instructions: Some(powershell_extra),
             },
             SupportedShell::Zsh => Self {
                 profile_file: "~/.zshrc",
                 init_command: "eval \"$(csm init zsh --code)\"",
                 wrapper: ZSH_WRAPPER,
+                ..Default::default()
             },
         }
     }
@@ -240,8 +252,8 @@ impl ShellConfiguration {
     }
 
     pub fn instructions(&self) -> String {
-        format!(
-            r#"To set up csm in your current shell session, run the following:
+        let out = format!(
+            "To set up csm in your current shell session, run the following:
     {}
 
 If you add it to your shell profile ({}), the hook should automatically be
@@ -249,11 +261,21 @@ enabled for future shell sessions.
 
 You could run the following command to add it automatically:
 
-    {}"#,
+    {}",
             self.init_command,
             self.profile_file,
             self.persist_command()
-        )
+        );
+        if let Some(extra) = self.extra_instructions {
+            format!(
+                "{}
+
+{}",
+                out, extra
+            )
+        } else {
+            out
+        }
     }
 }
 
