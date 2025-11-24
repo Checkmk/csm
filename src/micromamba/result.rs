@@ -39,6 +39,14 @@ impl MicromambaResult {
             _ => ExitCode::FAILURE,
         }
     }
+
+    pub fn exit_status(&self) -> Option<ExitStatus> {
+        match self {
+            Self::StreamedOutput(exit_status) => Some(*exit_status),
+            Self::CapturedOutput(output) => Some(output.status),
+            _ => None,
+        }
+    }
 }
 
 impl From<MicromambaResult> for Result<(), ExitCode> {
