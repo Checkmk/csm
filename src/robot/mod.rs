@@ -15,9 +15,6 @@ const SAMPLE_ROBOT: &[u8] = include_bytes!("../../templates/robot/sample.robot")
 pub enum Subcommand {
     /// Create a Robotmk robot
     Create(CreateArgs),
-
-    /// Run a Robotmk robot
-    Run,
 }
 
 #[derive(Debug, clap::Args)]
@@ -52,13 +49,8 @@ fn copy_minimal_template(to: &Path) -> io::Result<()> {
     Ok(())
 }
 
-pub fn run(config: Config, subcommand: Subcommand) -> io::Result<()> {
+pub fn run(_config: Config, subcommand: Subcommand) -> io::Result<()> {
     match subcommand {
         Subcommand::Create(args) => copy_minimal_template(&PathBuf::from(args.path)),
-        _ => {
-            println!("{:?}", config);
-            println!("{:?}", subcommand);
-            Ok(())
-        }
     }
 }
