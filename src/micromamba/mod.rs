@@ -39,7 +39,7 @@ fn block_on_child_exit(child: &mut std::process::Child) -> MicromambaResult {
 }
 
 fn exec_micromamba(cmd: &mut Command, stream_output: bool) -> MicromambaResult {
-    if stream_output {
+    let result = if stream_output {
         match cmd.spawn() {
             Ok(mut child) => block_on_child_exit(&mut child),
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
@@ -65,7 +65,22 @@ fn exec_micromamba(cmd: &mut Command, stream_output: bool) -> MicromambaResult {
                 MicromambaResult::CouldNotRun
             }
         }
+    };
+
+    if cfg!(windows)
+        && result
+            .exit_status()
+            .and_then(|s| s.code())
+            .is_some_and(|s| s == 0xc0000135u32 as i32)
+    {
+        error!("Windows reported a missing DLL required to run micromamba");
+        error!("This error can very likely be solved by installing the VC++ runtime libraries");
+        error!(
+            "See https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version for more information"
+        );
     }
+
+    result
 }
 
 impl<'a> Micromamba<'a> {
