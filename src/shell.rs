@@ -209,6 +209,7 @@ pub struct ShellConfiguration {
     pub profile_file: &'static str,
     pub init_command: &'static str,
     pub wrapper: &'static str,
+    pub prepend_persist_command: Option<&'static str>,
     pub extra_instructions: Option<&'static str>,
 }
 
@@ -236,6 +237,7 @@ impl ShellConfiguration {
                 profile_file: "$PROFILE",
                 init_command: "csm init powershell --code | Out-String | Invoke-Expression",
                 wrapper: PWSH_WRAPPER,
+                prepend_persist_command: Some(r"md -f $PROFILE\..; "),
                 extra_instructions: Some(powershell_extra),
             },
             SupportedShell::Zsh => Self {
@@ -248,7 +250,11 @@ impl ShellConfiguration {
     }
 
     fn persist_command(&self) -> String {
-        format!("echo '{}' >> {}", self.init_command, self.profile_file)
+        let pre = self.prepend_persist_command.unwrap_or_default();
+        format!(
+            "{}echo '{}' >> {}",
+            pre, self.init_command, self.profile_file
+        )
     }
 
     pub fn instructions(&self) -> String {
