@@ -49,3 +49,24 @@ jobs:
         if: always()
       - run: cargo build --release --features=__test_powershell
         if: always()
+
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+          rustflags: ""
+      - uses: mamba-org/setup-micromamba@v2
+        env:
+          ACTIONS_STEP_DEBUG: true
+      - run: cargo test --no-default-features --features=__test_zsh
+        if: always()
+      - run: cargo fmt --check
+        if: always()
+      - run: cargo clippy --all-targets
+        if: always()
+      - run: cargo build --release --features=__test_zsh
+        if: always()
