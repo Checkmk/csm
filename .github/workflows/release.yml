@@ -46,6 +46,12 @@ jobs:
           - runs-on: ubuntu-latest
             target: aarch64-unknown-linux-musl
 
+          - runs-on: macos-latest
+            target: x86_64-apple-darwin
+
+          - runs-on: macos-latest
+            target: aarch64-apple-darwin
+
     steps:
       - uses: actions/checkout@v4
 
@@ -63,8 +69,8 @@ jobs:
       - name: Clean build cache
         run: cargo clean
 
-      - name: Build (Windows)
-        if: ${{ matrix.runs-on == 'windows-latest' }}
+      - name: Build (Windows, macOS)
+        if: ${{ matrix.runs-on != 'ubuntu-latest' }}
         run: cargo build --release --all-features --target=${{ matrix.target }}
 
       - name: Build (Linux, cross compile)
@@ -80,9 +86,9 @@ jobs:
           cp target/${{ matrix.target }}/release/csm.exe release/
           Compress-Archive -Path release/ -DestinationPath csm-${{ github.ref_name }}-${{ matrix.target }}.zip
 
-      - name: Create a tar.gz (linux)
+      - name: Create a tar.gz (Linux, macOS)
         id: create-tar
-        if: ${{ matrix.runs-on == 'ubuntu-latest' }}
+        if: ${{ matrix.runs-on != 'windows-latest' }}
         run: |
           mkdir release
           cp LICENSE release/
@@ -108,11 +114,19 @@ jobs:
         include:
           - runs-on: windows-latest
           - runs-on: ubuntu-latest
+          - runs-on: macos-latest
     steps:
       - name: Try latest release (linux)
         if: ${{ matrix.runs-on == 'ubuntu-latest' }}
         run: |
           wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/csm-${{ github.ref_name }}-x86_64-unknown-linux-musl.tar.gz
+          tar -xvf csm-*.tar.gz
+          ./release/csm --version
+
+      - name: Try latest release (macOS)
+        if: ${{ matrix.runs-on == 'macos-latest' }}
+        run: |
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/csm-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz
           tar -xvf csm-*.tar.gz
           ./release/csm --version
 
