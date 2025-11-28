@@ -1,3 +1,4 @@
+use crate::csmrc::Config;
 use crate::env::{CommonArgs, env_name};
 use crate::micromamba::Micromamba;
 
@@ -19,7 +20,7 @@ pub struct Args {
     pub force: bool,
 }
 
-pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
+pub fn run(micromamba: Micromamba, args: Args, config: &Config) -> Result<(), ExitCode> {
     let env_name = env_name(args.common.name, &args.common.env_file)?;
     let Some(bin_path) = micromamba.bin_path_for_env(&env_name) else {
         error!(
@@ -34,7 +35,7 @@ pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
         "conda-pack"
     };
     let conda_pack = bin_path.join(binary_name);
-    if !conda_pack.exists() {
+    if !config.noop_mode && !conda_pack.exists() {
         debug!("Path does not exist: {:?}", conda_pack);
         error!(
             "conda-pack was not found in the environment. It must be installed to use this command."
