@@ -74,7 +74,7 @@ impl fmt::Display for DownloadError {
 /// OS-target-specific: Return the final executable name
 #[inline]
 const fn micromamba_executable_name() -> Result<&'static str, DownloadError> {
-    if cfg!(target_os = "linux") {
+    if cfg!(any(target_os = "linux", target_os = "macos")) {
         Ok("micromamba")
     } else if cfg!(target_os = "windows") {
         Ok("micromamba.exe")
@@ -169,7 +169,7 @@ fn write_micromamba<R: Read>(
 fn find_micromamba_in_archive<'a, R: Read>(
     tar_archive: &'a mut tar::Archive<R>,
 ) -> Result<tar::Entry<'a, R>, DownloadError> {
-    let archive_binary_dir = if cfg!(target_os = "linux") {
+    let archive_binary_dir = if cfg!(any(target_os = "linux", target_os = "macos")) {
         PathBuf::from("bin")
     } else if cfg!(target_os = "windows") {
         PathBuf::from("Library").join("bin")
