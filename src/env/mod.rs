@@ -130,7 +130,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
         Subcommand::Run(args) => run::run(micromamba, args),
         Subcommand::Activate(args) => activate::run(micromamba, args),
         Subcommand::Deactivate => deactivate::run(),
-        Subcommand::Pack(args) => pack::run(micromamba, args),
+        Subcommand::Pack(args) => pack::run(micromamba, args, &config),
         Subcommand::Unpack(args) => unpack::run(micromamba, args),
     }
 }

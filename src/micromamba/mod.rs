@@ -212,6 +212,9 @@ impl<'a> Micromamba<'a> {
 
     /// Query micromamba to try to determine the path for an environment
     pub fn path_for_env(&self, name: &str) -> Option<PathBuf> {
+        if self.config.noop_mode {
+            return Some(PathBuf::from("/no-op/mode/path/for/env"));
+        }
         let result = self.capture(vec!["info", "--name", name, "--json"]);
         let MicromambaResult::CapturedOutput(output) = result else {
             return None;
