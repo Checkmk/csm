@@ -234,6 +234,10 @@ impl<'a> Micromamba<'a> {
     ///
     /// If `force` is true, delete any pre-existing environment/directory at this path.
     pub fn create_env_dir(&self, name: &str, force: bool) -> Result<PathBuf, std::io::Error> {
+        if self.config.noop_mode {
+            info!("Using fake directory path due to no-op mode");
+            return Ok(PathBuf::from("/no-op/mode/path/for/env"));
+        }
         let env_path = match self.path_for_env(name) {
             Some(path) => path,
             None => {

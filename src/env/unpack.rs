@@ -1,3 +1,4 @@
+use crate::csmrc::Config;
 use crate::env::dump_micromamba_captured_output_on_error;
 use crate::micromamba::Micromamba;
 
@@ -28,7 +29,7 @@ fn archive_name_to_env_name(archive_path: &Path) -> Option<String> {
         .map(String::from)
 }
 
-pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
+pub fn run(micromamba: Micromamba, args: Args, config: &Config) -> Result<(), ExitCode> {
     let env_name = match args.name {
         Some(name) => name,
         None => match archive_name_to_env_name(&args.archive_path) {
@@ -69,19 +70,22 @@ pub fn run(micromamba: Micromamba, args: Args) -> Result<(), ExitCode> {
     })?;
     let decompressor = flate2::read::GzDecoder::new(archive_file);
     let mut archive = tar::Archive::new(decompressor);
-    archive.unpack(&target_env_path).map_err(|e| {
-        error!(
-            "Could not unpack archive to '{}': {}",
-            target_env_path.display(),
-            e
+    if config.noop_mode {
+        info!("Prepared to unpack the environment. Not actually extracting, due to no-op mode.");
+    } else {
+        archive.unpack(&target_env_path).map_err(|e| {
+            error!(
+                "Could not unpack archive to '{}': {}",
+                target_env_path.display(),
+                e
+            );
+            ExitCode::FAILURE
+        })?;
+        info!(
+            "Successfully unpacked environment to '{}'",
+            target_env_path.display()
         );
-        ExitCode::FAILURE
-    })?;
-    info!(
-        "Successfully unpacked environment to '{}'",
-        target_env_path.display()
-    );
-
+    }
     info!("Running 'conda-unpack' in the new environment to fix paths...");
     let result = micromamba.stream_if_verbose(vec!["run", "--name", &env_name, "conda-unpack"]);
     let rc = result.exit_code();
