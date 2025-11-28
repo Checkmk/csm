@@ -121,6 +121,9 @@ impl OsArch {
             ("linux", "x86_64") => Ok("linux-64"),
             ("linux", "aarch64") => Ok("linux-aarch64"),
             ("linux", _) => Err(DownloadError::IncompatibleArch),
+            ("macos", "x86_64") => Ok("osx-64"),
+            ("macos", "aarch64") => Ok("osx-arm64"),
+            ("macos", _) => Err(DownloadError::IncompatibleArch),
             _ => Err(DownloadError::IncompatibleOS),
         }
     }
@@ -233,6 +236,8 @@ mod tests {
             ("linux", "aarch64", "linux-aarch64"),
             ("linux", "x86_64", "linux-64"),
             ("windows", "x86_64", "win-64"),
+            ("macos", "aarch64", "osx-arm64"),
+            ("macos", "x86_64", "osx-64"),
         ];
         for (os, arch, expected) in green_path_cases {
             let os_arch = OsArch { os, arch };
@@ -248,6 +253,8 @@ mod tests {
             ("linux", "m68k"),
             ("windows", "aarch64"),
             ("windows", "arm"),
+            ("macos", "powerpc64"),
+            ("macos", "powerpc"),
         ];
         for (os, arch) in incompat_arch_cases {
             let os_arch = OsArch { os, arch };
