@@ -1,8 +1,6 @@
 use crate::csmrc::Config;
 
 use log::{debug, info};
-use rustls::ClientConfig;
-use rustls_platform_verifier::ConfigVerifierExt;
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -18,7 +16,6 @@ pub enum DownloadError {
     DownloadDisabled,
     IO(io::Error),
     Reqwest(reqwest::Error),
-    Rustls(rustls::Error),
 }
 
 impl From<io::Error> for DownloadError {
@@ -30,12 +27,6 @@ impl From<io::Error> for DownloadError {
 impl From<reqwest::Error> for DownloadError {
     fn from(err: reqwest::Error) -> Self {
         Self::Reqwest(err)
-    }
-}
-
-impl From<rustls::Error> for DownloadError {
-    fn from(err: rustls::Error) -> Self {
-        Self::Rustls(err)
     }
 }
 
@@ -66,7 +57,6 @@ impl fmt::Display for DownloadError {
                 }
                 Ok(())
             }
-            DownloadError::Rustls(e) => write!(f, "TLS (rustls) error: {}", e),
         }
     }
 }
@@ -211,10 +201,9 @@ pub fn download_micromamba(config: &Config) -> Result<PathBuf, DownloadError> {
         return Err(DownloadError::DownloadDisabled);
     }
 
-    let tls_config = ClientConfig::with_platform_verifier()?;
     let client = reqwest::blocking::Client::builder()
+        .tls_backend_rustls()
         .timeout(Duration::from_secs(60))
-        .use_preconfigured_tls(tls_config)
         .build()?;
     let response_tarbz2 = client.get(url).send()?;
     debug!("Download completed, sending it to BzDecoder");
