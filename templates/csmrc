@@ -1,0 +1,9 @@
+env_create:
+  # ssl_verify: true
+
+  # Optional, defaults to the system ca-certificates
+  # ssl_bundle: /path/to/file.pem
+
+  # When true, instructs micromamba to not check certificate revocation when using
+  # curl-based network operations.
+  # ssl_no_revoke: false
