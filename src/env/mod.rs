@@ -123,7 +123,7 @@ pub fn run(config: Config, subcommand: Subcommand) -> Result<(), ExitCode> {
     let micromamba = Micromamba::new(&config);
 
     match subcommand {
-        Subcommand::Create(args) => create::run(micromamba, args),
+        Subcommand::Create(args) => create::run(micromamba, args, &config),
         Subcommand::Delete(args) => delete::run(micromamba, args, &config),
         Subcommand::List => micromamba.stream(vec!["env", "list"]).into(),
         Subcommand::Info => micromamba.stream(vec!["info"]).into(),
