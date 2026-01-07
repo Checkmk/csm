@@ -22,6 +22,7 @@ pub struct MicromambaInfo {
 
 pub struct Micromamba<'a> {
     config: &'a Config,
+    env_vars: HashMap<String, String>,
 }
 
 fn block_on_child_exit(child: &mut std::process::Child) -> MicromambaResult {
@@ -85,21 +86,34 @@ fn exec_micromamba(cmd: &mut Command, stream_output: bool) -> MicromambaResult {
 
 impl<'a> Micromamba<'a> {
     pub fn new(config: &'a Config) -> Self {
-        Self { config }
+        let mut micromamba = Self {
+            config,
+            env_vars: HashMap::new(),
+        };
+        if let Some(mamba_root_prefix) = &config.mamba_root_prefix {
+            micromamba.set_env_var("MAMBA_ROOT_PREFIX", mamba_root_prefix);
+        }
+        micromamba
+    }
+
+    /// Helper method to insert environment variables with &str for convenience
+    pub fn set_env_var(&mut self, key: &str, value: &str) {
+        self.env_vars.insert(key.to_string(), value.to_string());
     }
 
     /// Return a [`Command`] ready to shell out to `micromamba` with the appropriate
     /// environment variables set based on configuration.
     fn micromamba_at(&self, path: &str, args: &Vec<&str>) -> Command {
-        let mut env_vars: HashMap<&str, String> = HashMap::new();
-
-        if let Some(mamba_root_prefix) = &self.config.mamba_root_prefix {
-            env_vars.insert("MAMBA_ROOT_PREFIX", mamba_root_prefix.to_string());
-        }
+        // On Windows, the env vars don't get shown by the Debug instance for
+        // Command, so print them ourselves (always, to make testing easier).
+        debug!(
+            "Running command with these environment variables: {:?}",
+            self.env_vars
+        );
 
         let mut cmd = Command::new(path);
         cmd.args(args);
-        cmd.envs(env_vars);
+        cmd.envs(&self.env_vars);
         if self.config.noop_mode {
             info!("Would run: {:?}", cmd);
         } else {

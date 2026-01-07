@@ -35,3 +35,38 @@ available:
   administrator), `csm.exe` will prompt for confirmation before continuing.
   Setting this configuration option to true, disables the check entirely. This
   option does nothing on non-Windows systems.
+
+* **`env_create` section** - for options affecting the `csm env create`
+  subcommand.
+
+  * `ssl_verify` - A boolean, which, if true (default) enables SSL/TLS
+    certificate verification. If false, verification is disabled when calling
+    `micromamba` and when using `pip`. Setting this to false has the effect of
+    setting the following environment variables when `csm` calls `micromamba`:
+
+    - `CURL_CA_BUNDLE=""`
+    - `PIP_CERT=""`
+    - `PIP_INDEX_URL="https://pypi.org/simple"`
+    - `PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org pypi.pythonhosted.org"`
+    - `REQUESTS_CA_BUNDLE=""`
+
+    This setting (and `ssl_bundle` below) can be overridden with the
+    `--ssl-verify` command-line argument to `csm env create`.
+
+  * `ssl_bundle` - A string which configures the SSL/TLS certificate bundle to
+    use when verifying certificates. Only taken into account when `ssl_verify`
+    is true. Setting this has the effect of setting the following environment
+    variables when `csm` calls `micromamba`:
+
+    - `CURL_CA_BUNDLE="<value>"`
+    - `PIP_CERT="<value>"`
+    - `REQUESTS_CA_BUNDLE="<value>"`
+
+  * `ssl_no_revoke` - A boolean which instructs `micromamba` to not check
+    SSL/TLS certificate revokation. Setting this has the effect of setting the
+    following environment variable when `csm` calls `micromamba`:
+
+    - `MAMBA_SSL_NO_REVOKE="true"`
+
+    This setting can be overridden with the `--ssl-no-revoke` command-line
+    switch to `csm env create`.
