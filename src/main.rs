@@ -86,13 +86,13 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    if let Err(e) = create_mambarc(&config, &home) {
-        let attempted_path = home.join(".mambarc");
-        warn!(
-            "Could not create {}, but continuing: {}",
-            attempted_path.display(),
-            e
-        );
+    let mambarc = include_str!("../templates/mambarc");
+    let csmrc = include_str!("../templates/csmrc");
+    for (dotfile, contents) in [(".mambarc", mambarc), (".csmrc", csmrc)] {
+        let path = home.join(dotfile);
+        if let Err(e) = create_config_file(&config, &path, contents) {
+            warn!("Could not create {}, but continuing: {}", path.display(), e);
+        }
     }
 
     #[cfg(windows)]
@@ -134,24 +134,20 @@ fn main() -> ExitCode {
     }
 }
 
-/// Create a ~/.mambarc (%UserProfile%\.mambarc on Windows) if it does not
-/// exist.
-fn create_mambarc(config: &Config, home: &Path) -> std::io::Result<()> {
-    let mambarc = include_str!("../templates/mambarc");
-    let mambarc_path = home.join(".mambarc");
-
-    if config.noop_mode && !mambarc_path.exists() {
-        info!("Would create {}", mambarc_path.display());
+/// Create a configuration file (e.g. .mambarc or .csmrc) if it does not exist.
+fn create_config_file(config: &Config, path: &Path, contents: &str) -> std::io::Result<()> {
+    if config.noop_mode && !path.exists() {
+        info!("Would create {}", path.display());
         return Ok(());
     }
 
-    match File::create_new(&mambarc_path) {
-        Ok(mut file) => file.write_all(mambarc.trim_start().as_bytes())?,
+    match File::create_new(path) {
+        Ok(mut file) => {
+            file.write_all(contents.trim_start().as_bytes())?;
+            debug!("Created {}", path.display());
+        }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            debug!(
-                "File {} already exists, not creating",
-                mambarc_path.display()
-            )
+            debug!("File {} already exists, not creating", path.display())
         }
         Err(e) => return Err(e),
     }
