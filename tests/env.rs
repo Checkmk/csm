@@ -286,7 +286,7 @@ fn test_csm_env_pack_unpack() -> Result<(), Error> {
             "test_csm_env_pack",
             "pip",
             "install",
-            "conda-pack==0.8.1",
+            "conda-pack",
         ])
         .assert()
         .success();
