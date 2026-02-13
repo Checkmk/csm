@@ -20,3 +20,4 @@ testrun/*
 *.run
 playwright-log.txt
 results
+.robot.toml
