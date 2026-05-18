@@ -39,6 +39,8 @@ jobs:
           rustflags: ""
           target: x86_64-pc-windows-msvc
       - uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: 2.6.0-0
         env:
           ACTIONS_STEP_DEBUG: true
       - run: cargo test --no-default-features --features=__test_powershell
